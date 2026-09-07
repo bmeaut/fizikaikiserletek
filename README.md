@@ -1,0 +1,2 @@
+# fizikaikiserletek
+Fizikai kísérletek vegyesen
