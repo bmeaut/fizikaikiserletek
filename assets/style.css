@@ -65,7 +65,7 @@ main {
   max-width: 900px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 1.5rem 1rem;
 }
 
 .intro {
@@ -91,8 +91,8 @@ main {
   box-shadow: var(--shadow);
   display: flex;
   align-items: flex-start;
-  gap: 1.5rem;
-  padding: 1.4rem;
+  gap: 1rem;
+  padding: 1rem;
   transition: box-shadow 0.2s;
 }
 
@@ -144,14 +144,41 @@ main {
 
 .app-qr canvas,
 .app-qr img {
+  width: 100px;
+  height: 100px;
   border-radius: 6px;
   border: 1px solid var(--color-border);
+}
+
+.app-qr img {
+  cursor: zoom-in;
 }
 
 .qr-label {
   font-size: 0.72rem;
   color: var(--color-text-muted);
   text-align: center;
+}
+
+/* ── QR lightbox ── */
+#qr-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+#qr-lightbox.open {
+  display: flex;
+}
+#qr-lightbox img {
+  width: min(90vw, 90vh);
+  height: min(90vw, 90vh);
+  border-radius: 12px;
+  image-rendering: pixelated;
 }
 
 /* ── Empty state ── */
@@ -176,7 +203,7 @@ footer a {
 }
 
 /* ── Responsive: stack QR below on narrow screens ── */
-@media (max-width: 520px) {
+@media (max-width: 480px) {
   .app-card {
     flex-direction: column;
   }
@@ -184,5 +211,11 @@ footer a {
     width: 100%;
     flex-direction: row;
     justify-content: flex-start;
+    align-items: center;
+  }
+  .app-qr img,
+  .app-qr canvas {
+    width: 80px;
+    height: 80px;
   }
 }
