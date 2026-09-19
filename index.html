@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fizikai Kísérletek</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a237e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Fizikai Kísérletek" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header>
+    <h1>⚗️ Fizikai Kísérletek</h1>
+    <p class="subtitle">Mobil alkalmazások fizikai kísérletekhez</p>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p>
+        Ez az oldal fizikai kísérletekhez készült progresszív webalkalmazásokat (PWA) gyűjt össze.
+        Az alkalmazások okostelefonra telepíthetők, és internet-kapcsolat nélkül is működnek.
+      </p>
+    </section>
+
+    <!-- APP KÁRTYÁK — minden új alkalmazáshoz adjunk hozzá egy .app-card elemet -->
+    <section class="app-grid" id="app-grid">
+
+      <!-- PÉLDA KÁRTYA (töröld ki, ha van igazi alkalmazás)
+      <article class="app-card">
+        <div class="app-info">
+          <h2 class="app-title">Inga</h2>
+          <p class="app-desc">Egyszerű inga szimulációja és időmérése.</p>
+          <a class="app-link" href="apps/inga/">Megnyitás →</a>
+        </div>
+        <div class="app-qr">
+          <canvas class="qr-canvas" data-url="https://FELHASZNÁLÓNÉV.github.io/fizikaikiserletek/apps/inga/"></canvas>
+          <p class="qr-label">QR-kód az alkalmazáshoz</p>
+        </div>
+      </article>
+      -->
+
+      <p class="empty-state">Hamarosan érkeznek az alkalmazások…</p>
+
+    </section>
+  </main>
+
+  <footer>
+    <p>Forrás: <a href="https://github.com/molnarmarton/fizikaikiserletek" target="_blank" rel="noopener">GitHub</a></p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="assets/main.js"></script>
+</body>
+</html>
