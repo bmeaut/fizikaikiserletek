@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tapadási együttható</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a237e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tapadás" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --primary: #1a237e;
+      --primary-l: #3949ab;
+      --accent: #00897b;
+      --danger: #c62828;
+      --warn: #f57f17;
+      --text: #1a1a1a;
+      --text-m: #666;
+      --border: #ddd;
+      --radius: 14px;
+      --sh: 0 2px 10px rgba(0,0,0,.10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121212; --surface: #1e1e2e; --primary: #7986cb; --primary-l: #9fa8da;
+        --accent: #4db6ac; --danger: #ef9a9a; --warn: #ffcc02;
+        --text: #e0e0e0; --text-m: #999; --border: #333; --sh: 0 2px 10px rgba(0,0,0,.4);
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1rem 1.25rem .8rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; }
+    header .sub { font-size: .78rem; opacity: .8; }
+
+    main { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; max-width: 600px; width: 100%; margin: 0 auto; }
+
+    /* ── Permission screen ── */
+    #perm-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1.2rem; flex: 1; text-align: center; padding: 2rem;
+    }
+    #perm-screen h2 { font-size: 1.1rem; }
+    #perm-screen p { color: var(--text-m); font-size: .9rem; line-height: 1.5; }
+
+    /* ── Live display ── */
+    #live-section { display: none; flex-direction: column; gap: 1rem; }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--sh);
+      padding: 1.1rem 1.25rem;
+    }
+
+    /* Angle gauge */
+    .gauge-wrap { display: flex; align-items: center; gap: 1.25rem; }
+    .gauge-num {
+      font-size: 3.5rem; font-weight: 700; font-variant-numeric: tabular-nums;
+      line-height: 1; color: var(--primary);
+      min-width: 4.5ch;
+    }
+    .gauge-unit { font-size: 1rem; color: var(--text-m); align-self: flex-end; padding-bottom: .5rem; }
+    .gauge-bar-wrap { flex: 1; }
+    .gauge-label { font-size: .75rem; color: var(--text-m); margin-bottom: .3rem; }
+    .gauge-bar-bg {
+      height: 14px; background: var(--border); border-radius: 7px; overflow: hidden;
+    }
+    .gauge-bar-fill {
+      height: 100%; border-radius: 7px;
+      background: linear-gradient(90deg, var(--accent), var(--warn), var(--danger));
+      transition: width .1s linear;
+      width: 0%;
+    }
+    .mu-display {
+      margin-top: .8rem;
+      display: flex; align-items: baseline; gap: .4rem;
+    }
+    .mu-label { font-size: .85rem; color: var(--text-m); }
+    .mu-val { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+    /* Status pill */
+    .status-pill {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: .82rem; font-weight: 600; padding: .3rem .85rem;
+      border-radius: 99px; user-select: none;
+    }
+    .pill-measuring { background: #e8f5e9; color: #2e7d32; }
+    .pill-slip      { background: #fff3e0; color: #e65100; }
+    .pill-idle      { background: #ede7f6; color: #4527a0; }
+    @media (prefers-color-scheme: dark) {
+      .pill-measuring { background: #1b3a1f; color: #a5d6a7; }
+      .pill-slip      { background: #3e2000; color: #ffcc80; }
+      .pill-idle      { background: #1a0a3a; color: #ce93d8; }
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .dot.pulse { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Buttons */
+    .btn {
+      border: none; border-radius: 9px; font-size: .95rem; font-weight: 600;
+      padding: .7rem 1.4rem; cursor: pointer; transition: opacity .15s;
+    }
+    .btn:active { opacity: .75; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-accent  { background: var(--accent);  color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-ghost   { background: transparent; color: var(--text-m); border: 1px solid var(--border); }
+    .btn-row { display: flex; gap: .7rem; flex-wrap: wrap; }
+
+    /* Slip result popup */
+    #slip-result {
+      display: none;
+      background: var(--surface);
+      border: 2px solid var(--warn);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      box-shadow: var(--sh);
+    }
+    #slip-result h3 { margin-bottom: .6rem; font-size: 1rem; }
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .75rem; margin-bottom: .9rem; }
+    .result-item label { font-size: .75rem; color: var(--text-m); display: block; }
+    .result-item span { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* History */
+    #history-section h2 { font-size: .95rem; font-weight: 600; color: var(--text-m); margin-bottom: .6rem; text-transform: uppercase; letter-spacing: .05em; }
+    #history-list { display: flex; flex-direction: column; gap: .5rem; }
+    .hist-item {
+      background: var(--surface); border-radius: 10px; box-shadow: var(--sh);
+      padding: .75rem 1rem;
+      display: grid; grid-template-columns: auto 1fr auto auto;
+      align-items: center; gap: .5rem .75rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .hist-idx { font-size: .75rem; color: var(--text-m); }
+    .hist-label { font-size: .82rem; color: var(--text-m); }
+    .hist-mu { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+    .hist-angle { font-size: .82rem; color: var(--text-m); }
+    .hist-del {
+      background: none; border: none; cursor: pointer; color: var(--danger);
+      font-size: 1rem; padding: .2rem .4rem; border-radius: 6px; line-height: 1;
+    }
+    .hist-del:active { opacity: .6; }
+    #no-history { color: var(--text-m); font-size: .9rem; text-align: center; padding: 1rem; }
+
+    /* Sensitivity slider */
+    .slider-row { display: flex; align-items: center; gap: .75rem; font-size: .85rem; color: var(--text-m); }
+    .slider-row input[type=range] { flex: 1; accent-color: var(--primary); }
+    .slider-val { min-width: 3ch; text-align: right; font-weight: 600; }
+
+    /* Permission button */
+    .btn-big {
+      padding: 1rem 2rem; font-size: 1rem; border-radius: 12px;
+      background: var(--primary); color: #fff; border: none; cursor: pointer; font-weight: 700;
+    }
+
+    /* iOS note */
+    .note { font-size: .78rem; color: var(--text-m); line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Tapadási együttható mérő</h1>
+    <div class="sub">Helyezd a telefont felületre, majd döntsd meg!</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Permission screen (iOS Safari requires a tap) ── -->
+  <div id="perm-screen">
+    <div style="font-size:3rem">📐</div>
+    <h2>Mozgásérzékelő engedély</h2>
+    <p>
+      Az alkalmazás a telefon gyorsulásmérőjét használja.<br>
+      iOS eszközön ehhez engedélyt kell megadni.
+    </p>
+    <button class="btn-big" id="perm-btn">Engedély megadása / Indítás</button>
+    <p class="note">Androidon és asztali gépen az engedélykérés automatikus.</p>
+  </div>
+
+  <!-- ── Live measurement section ── -->
+  <div id="live-section">
+
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem;">
+        <div id="status-pill" class="status-pill pill-idle">
+          <span class="dot"></span>
+          <span id="status-text">Várakozás</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-accent" id="start-btn">▶ Mérés indítása</button>
+          <button class="btn btn-danger" id="stop-btn" style="display:none">■ Stop</button>
+        </div>
+      </div>
+
+      <div class="gauge-wrap">
+        <div>
+          <div class="gauge-num" id="angle-display">0.0</div>
+        </div>
+        <div class="gauge-unit">°</div>
+        <div class="gauge-bar-wrap">
+          <div class="gauge-label">Dőlésszög (0° – 60°)</div>
+          <div class="gauge-bar-bg"><div class="gauge-bar-fill" id="angle-bar"></div></div>
+          <div class="mu-display">
+            <span class="mu-label">μ (aktuális) =</span>
+            <span class="mu-val" id="mu-display">0.000</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slip detected result -->
+    <div id="slip-result">
+      <h3>🎯 Csúszás észlelve!</h3>
+      <div class="result-grid">
+        <div class="result-item">
+          <label>Dőlésszög</label>
+          <span id="res-angle">—</span>°
+        </div>
+        <div class="result-item">
+          <label>Tapadási együttható μ</label>
+          <span id="res-mu">—</span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="save-btn">💾 Mentés</button>
+        <button class="btn btn-ghost"   id="discard-btn">Elvetés</button>
+      </div>
+    </div>
+
+    <!-- Sensitivity -->
+    <div class="card">
+      <div style="font-size:.82rem; font-weight:600; color:var(--text-m); margin-bottom:.5rem;">Érzékenység (csúszásérzékelés)</div>
+      <div class="slider-row">
+        <span>alacsony</span>
+        <input type="range" id="sensitivity" min="1" max="10" value="5" />
+        <span>magas</span>
+        <span class="slider-val" id="sens-val">5</span>
+      </div>
+      <div class="note" style="margin-top:.4rem;">
+        Magas érzékenység → korábbi észlelés, de több téves riasztás.
+      </div>
+    </div>
+
+  </div><!-- /live-section -->
+
+  <!-- ── History ── -->
+  <section id="history-section">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <h2>Eredmények</h2>
+      <button class="btn btn-ghost" id="clear-btn" style="font-size:.8rem; padding:.3rem .7rem;">Összes törlése</button>
+    </div>
+    <div id="history-list">
+      <p id="no-history">Még nincs mért érték.</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'surlodas_history';
+// Slip detection: jerk = |a_now - a_prev|; threshold = BASE * (11 - sensitivity) / 10
+const JERK_BASE = 3.0; // m/s² — tunable via slider
+
+// ── State ──────────────────────────────────────────────────────────────────
+let measuring = false;
+let lastAccel = null;       // {x,y,z}
+let smoothedAngle = 0;      // low-pass filtered angle
+let preSlipAngle = null;    // angle just before jerk spike
+let sensitivity = 5;
+let sensorActive = false;
+let history = loadHistory();
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const permScreen   = document.getElementById('perm-screen');
+const permBtn      = document.getElementById('perm-btn');
+const liveSection  = document.getElementById('live-section');
+const startBtn     = document.getElementById('start-btn');
+const stopBtn      = document.getElementById('stop-btn');
+const angleDisplay = document.getElementById('angle-display');
+const angleBar     = document.getElementById('angle-bar');
+const muDisplay    = document.getElementById('mu-display');
+const statusPill   = document.getElementById('status-pill');
+const statusText   = document.getElementById('status-text');
+const slipResult   = document.getElementById('slip-result');
+const resAngle     = document.getElementById('res-angle');
+const resMu        = document.getElementById('res-mu');
+const saveBtn      = document.getElementById('save-btn');
+const discardBtn   = document.getElementById('discard-btn');
+const sensSlider   = document.getElementById('sensitivity');
+const sensVal      = document.getElementById('sens-val');
+const histList     = document.getElementById('history-list');
+const noHistory    = document.getElementById('no-history');
+const clearBtn     = document.getElementById('clear-btn');
+
+// ── Permission / sensor init ───────────────────────────────────────────────
+permBtn.addEventListener('click', async () => {
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const res = await DeviceMotionEvent.requestPermission();
+      if (res !== 'granted') {
+        alert('Az engedélyt meg kell adni a méréshez.');
+        return;
+      }
+    } catch (e) {
+      alert('Nem sikerült az engedélykérés: ' + e.message);
+      return;
+    }
+  }
+  startSensor();
+});
+
+function startSensor() {
+  if (sensorActive) return;
+  window.addEventListener('devicemotion', onMotion);
+  sensorActive = true;
+  permScreen.style.display = 'none';
+  liveSection.style.display = 'flex';
+}
+
+// ── Motion handler ─────────────────────────────────────────────────────────
+function onMotion(e) {
+  const ag = e.accelerationIncludingGravity;
+  if (!ag) return;
+
+  const ax = ag.x ?? 0;
+  const ay = ag.y ?? 0;
+  const az = ag.z ?? 0;
+
+  // Tilt angle: angle between gravity vector and the screen-normal axis (z)
+  const g  = Math.sqrt(ax*ax + ay*ay + az*az);
+  if (g < 0.5) return; // sensor not ready
+
+  // θ = angle from horizontal (0° = flat, 90° = vertical)
+  const rawAngle = Math.acos(Math.abs(az) / g) * 180 / Math.PI;
+
+  // Low-pass filter
+  const ALPHA = 0.15;
+  smoothedAngle = ALPHA * rawAngle + (1 - ALPHA) * smoothedAngle;
+
+  // Update live display always (so user can see tilt before starting)
+  updateDisplay(smoothedAngle);
+
+  if (!measuring) return;
+
+  // Jerk detection (change in total acceleration magnitude relative to g)
+  const jerk = lastAccel
+    ? Math.sqrt(
+        (ax - lastAccel.x)**2 +
+        (ay - lastAccel.y)**2 +
+        (az - lastAccel.z)**2
+      )
+    : 0;
+
+  lastAccel = { x: ax, y: ay, z: az };
+
+  const threshold = JERK_BASE * (11 - sensitivity) / 5;
+
+  if (jerk > threshold && preSlipAngle !== null && preSlipAngle > 2) {
+    onSlipDetected(preSlipAngle);
+    return;
+  }
+
+  // Store angle just before potential slip (with a small lag)
+  preSlipAngle = smoothedAngle;
+}
+
+// ── Display ────────────────────────────────────────────────────────────────
+function updateDisplay(angle) {
+  const mu = Math.tan(angle * Math.PI / 180);
+  angleDisplay.textContent = angle.toFixed(1);
+  muDisplay.textContent    = mu.toFixed(3);
+  angleBar.style.width     = Math.min(angle / 60 * 100, 100) + '%';
+}
+
+// ── Measurement control ────────────────────────────────────────────────────
+startBtn.addEventListener('click', () => {
+  if (!sensorActive) { permBtn.click(); return; }
+  measuring    = true;
+  lastAccel    = null;
+  preSlipAngle = null;
+  slipResult.style.display = 'none';
+  startBtn.style.display   = 'none';
+  stopBtn.style.display    = '';
+  setStatus('measuring');
+});
+
+stopBtn.addEventListener('click', stopMeasuring);
+
+function stopMeasuring() {
+  measuring = false;
+  startBtn.style.display = '';
+  stopBtn.style.display  = 'none';
+  setStatus('idle');
+}
+
+// ── Slip detected ──────────────────────────────────────────────────────────
+function onSlipDetected(angle) {
+  stopMeasuring();
+  const mu = Math.tan(angle * Math.PI / 180);
+  resAngle.textContent = angle.toFixed(1);
+  resMu.textContent    = mu.toFixed(3);
+  slipResult.style.display = 'block';
+  setStatus('slip');
+
+  // Vibrate if supported
+  if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+
+  saveBtn.onclick = () => {
+    addToHistory(angle, mu);
+    slipResult.style.display = 'none';
+    setStatus('idle');
+  };
+  discardBtn.onclick = () => {
+    slipResult.style.display = 'none';
+    setStatus('idle');
+  };
+}
+
+// ── Status pill ────────────────────────────────────────────────────────────
+function setStatus(state) {
+  statusPill.className = 'status-pill';
+  const dot = statusPill.querySelector('.dot');
+  dot.classList.remove('pulse');
+  if (state === 'measuring') {
+    statusPill.classList.add('pill-measuring');
+    statusText.textContent = 'Mérés folyamatban…';
+    dot.classList.add('pulse');
+  } else if (state === 'slip') {
+    statusPill.classList.add('pill-slip');
+    statusText.textContent = 'Csúszás észlelve!';
+  } else {
+    statusPill.classList.add('pill-idle');
+    statusText.textContent = 'Várakozás';
+  }
+}
+
+// ── Sensitivity slider ─────────────────────────────────────────────────────
+sensSlider.addEventListener('input', () => {
+  sensitivity = parseInt(sensSlider.value);
+  sensVal.textContent = sensitivity;
+});
+
+// ── History ────────────────────────────────────────────────────────────────
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveHistory() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+}
+function addToHistory(angle, mu) {
+  const entry = {
+    id: Date.now(),
+    ts: new Date().toLocaleString('hu-HU'),
+    angle: +angle.toFixed(1),
+    mu: +mu.toFixed(3),
+  };
+  history.unshift(entry);
+  saveHistory();
+  renderHistory();
+}
+function deleteHistoryItem(id) {
+  history = history.filter(h => h.id !== id);
+  saveHistory();
+  renderHistory();
+}
+function renderHistory() {
+  histList.innerHTML = '';
+  if (history.length === 0) {
+    histList.appendChild(noHistory);
+    noHistory.style.display = '';
+    return;
+  }
+  noHistory.style.display = 'none';
+  history.forEach((h, i) => {
+    const el = document.createElement('div');
+    el.className = 'hist-item';
+    el.innerHTML = `
+      <span class="hist-idx">#${history.length - i}</span>
+      <span class="hist-label">${h.ts}</span>
+      <span class="hist-mu">μ = ${h.mu}</span>
+      <span class="hist-angle">${h.angle}°</span>
+      <button class="hist-del" title="Törlés" data-id="${h.id}">✕</button>
+    `;
+    el.querySelector('.hist-del').addEventListener('click', () => deleteHistoryItem(h.id));
+    histList.appendChild(el);
+  });
+}
+
+clearBtn.addEventListener('click', () => {
+  if (history.length === 0) return;
+  if (confirm('Biztosan törlöd az összes eredményt?')) {
+    history = [];
+    saveHistory();
+    renderHistory();
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+renderHistory();
+
+// Auto-start sensor on non-iOS (no permission needed)
+if (typeof DeviceMotionEvent !== 'undefined' &&
+    typeof DeviceMotionEvent.requestPermission !== 'function') {
+  startSensor();
+}
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+
+</body>
+</html>
