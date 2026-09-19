@@ -1,14 +1,36 @@
-// Generate QR codes for every .qr-canvas element that has a data-url attribute.
-// QRCode.js must be loaded before this script.
+// Generate QR codes using qrcode-generator library.
+// Each .qr-canvas element with a data-url attribute gets an <img> inserted after it.
 document.querySelectorAll('.qr-canvas[data-url]').forEach((canvas) => {
-  new QRCode(canvas, {
-    text: canvas.dataset.url,
-    width: 128,
-    height: 128,
-    colorDark: '#000000',
-    colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
-  });
+  const qr = qrcode(0, 'M');
+  qr.addData(canvas.dataset.url);
+  qr.make();
+
+  const img = document.createElement('img');
+  img.src = qr.createDataURL(4, 0);
+  img.alt = 'QR-kód';
+  img.width = 128;
+  img.height = 128;
+  img.style.borderRadius = '6px';
+  img.addEventListener('click', () => openLightbox(img.src));
+  canvas.replaceWith(img);
+});
+
+// ── QR lightbox ──────────────────────────────────────────────────────────
+const lightbox = document.createElement('div');
+lightbox.id = 'qr-lightbox';
+const lightboxImg = document.createElement('img');
+lightboxImg.alt = 'QR-kód nagyítva';
+lightbox.appendChild(lightboxImg);
+document.body.appendChild(lightbox);
+
+function openLightbox(src) {
+  lightboxImg.src = src;
+  lightbox.classList.add('open');
+}
+
+lightbox.addEventListener('click', () => lightbox.classList.remove('open'));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') lightbox.classList.remove('open');
 });
 
 // Register service worker
