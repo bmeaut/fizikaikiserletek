@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const { randomUUID } = require('crypto');
 const { startServer, stopServer } = require('./server/server');
 const { verifyPassword, changePassword, isFirstRun } = require('./server/auth');
 
@@ -48,7 +49,11 @@ function createControl() {
   });
   controlWin.setMenu(null);
   controlWin.loadFile('renderer/control.html');
-  controlWin.on('closed', () => { controlWin = null; });
+  controlWin.on('closed', () => {
+    controlWin = null;
+    stopServer();
+    app.quit();
+  });
 }
 
 app.whenReady().then(createLauncher);
@@ -132,7 +137,7 @@ ipcMain.handle('session:import-csv', async (_, { token }) => {
 
 ipcMain.handle('password:verify', async (_, { password }) => {
   const ok = await verifyPassword(password);
-  if (ok) activeToken = crypto.randomUUID();
+  if (ok) activeToken = randomUUID();
   return { ok, token: ok ? activeToken : null };
 });
 
