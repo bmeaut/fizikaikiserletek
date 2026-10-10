@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Oszcilloszkóp</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a237e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Oszcilloszkóp" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5; --surface: #fff; --primary: #1a237e; --primary-l: #3949ab;
+      --accent: #00897b; --danger: #c62828; --text: #1a1a1a; --text-m: #666;
+      --border: #ddd; --radius: 14px; --sh: 0 2px 10px rgba(0,0,0,.10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121212; --surface: #1e1e2e; --primary: #7986cb; --primary-l: #9fa8da;
+        --accent: #4db6ac; --danger: #ef9a9a; --text: #e0e0e0; --text-m: #999;
+        --border: #333; --sh: 0 2px 10px rgba(0,0,0,.4);
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100svh; display: flex; flex-direction: column;
+    }
+    header {
+      background: var(--primary); color: #fff;
+      padding: .9rem 1.25rem; display: flex; align-items: center; gap: .75rem;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; }
+    header .sub { font-size: .78rem; opacity: .8; margin-top: .1rem; }
+
+    main { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 1rem;
+           max-width: 520px; width: 100%; margin: 0 auto; }
+
+    .card { background: var(--surface); border-radius: var(--radius);
+            box-shadow: var(--sh); padding: 1.1rem 1.25rem; }
+
+    .screen { display: none; flex-direction: column; gap: 1rem; }
+    .screen.active { display: flex; }
+
+    /* ── Buttons ── */
+    .btn { border: none; border-radius: 9px; font-size: .95rem; font-weight: 600;
+           padding: .7rem 1.4rem; cursor: pointer; transition: opacity .15s; width: 100%; }
+    .btn:active { opacity: .75; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-accent  { background: var(--accent);  color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-ghost   { background: transparent; color: var(--text-m); border: 1px solid var(--border); }
+    .btn-row { display: flex; gap: .6rem; }
+    .btn-row .btn { flex: 1; }
+
+    /* ── Form ── */
+    label { font-size: .82rem; color: var(--text-m); display: block; margin-bottom: .3rem; }
+    input[type=text] {
+      width: 100%; padding: .6rem .85rem; border: 1px solid var(--border);
+      border-radius: 8px; font-size: .95rem; background: var(--bg); color: var(--text);
+      outline: none;
+    }
+    input[type=text]:focus { border-color: var(--primary); }
+    .field { display: flex; flex-direction: column; gap: .25rem; }
+
+    /* ── QR scanner ── */
+    #qr-video-wrap {
+      position: relative; border-radius: 10px; overflow: hidden;
+      background: #000; aspect-ratio: 1;
+    }
+    #qr-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #qr-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .qr-frame {
+      width: 55%; height: 55%; border: 3px solid rgba(255,255,255,.8); border-radius: 8px;
+    }
+    #qr-hint { font-size: .8rem; color: var(--text-m); text-align: center; }
+
+    /* ── Status pill ── */
+    .pill {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: .82rem; font-weight: 600; padding: .3rem .85rem;
+      border-radius: 99px; align-self: flex-start;
+    }
+    .pill-ok   { background: #e8f5e9; color: #2e7d32; }
+    .pill-warn { background: #fff3e0; color: #e65100; }
+    .pill-idle { background: #ede7f6; color: #4527a0; }
+    @media (prefers-color-scheme: dark) {
+      .pill-ok   { background: #1b3a1f; color: #a5d6a7; }
+      .pill-warn { background: #3e2000; color: #ffcc80; }
+      .pill-idle { background: #1a0a3a; color: #ce93d8; }
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .dot.pulse { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Mini waveform ── */
+    #mini-canvas {
+      width: 100%; height: 80px; border-radius: 8px;
+      background: #0a0a1a; display: block;
+    }
+
+    /* ── Info rows ── */
+    .info-row { display: flex; justify-content: space-between; font-size: .85rem; }
+    .info-row .lbl { color: var(--text-m); }
+    .info-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .section-title {
+      font-size: .78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-m); margin-bottom: .5rem;
+    }
+
+    .note { font-size: .78rem; color: var(--text-m); line-height: 1.5; }
+    .error-msg { font-size: .85rem; color: var(--danger); min-height: 1.2em; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🎙️ Oszcilloszkóp</h1>
+    <div class="sub">Csatlakozz a tanári szerverhez</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══ SCREEN 1: Csatlakozás ══ -->
+  <div id="screen-connect" class="screen active">
+
+    <div class="card">
+      <div class="section-title">Szerver IP-cím</div>
+      <div class="field">
+        <label for="ip-input">Szerver WebSocket URL</label>
+        <input type="text" id="ip-input" placeholder="pl. 192.168.1.5:3443" autocomplete="off" />
+      </div>
+      <p class="note" style="margin-top:.5rem;">
+        A tanár a szerverindítás után QR-kódot mutat — olvasd be alább,
+        vagy add meg kézzel.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="section-title">QR-kód beolvasás</div>
+      <div id="qr-video-wrap" style="display:none;">
+        <video id="qr-video" playsinline muted></video>
+        <div id="qr-overlay"><div class="qr-frame"></div></div>
+      </div>
+      <div class="btn-row" style="margin-top:.75rem;">
+        <button class="btn btn-ghost" id="scan-btn">📷 QR beolvasás</button>
+        <button class="btn btn-ghost" id="scan-stop-btn" style="display:none;">✕ Mégse</button>
+      </div>
+      <p id="qr-hint" class="qr-hint" style="margin-top:.5rem;display:none;"></p>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Eszköznév (opcionális)</div>
+      <div class="field">
+        <label for="name-input">Megjelenített név a projektoron</label>
+        <input type="text" id="name-input" placeholder="pl. Ablak melletti pad" maxlength="40" />
+      </div>
+    </div>
+
+    <p class="error-msg" id="connect-error"></p>
+    <button class="btn btn-primary" id="connect-btn">Csatlakozás →</button>
+
+  </div>
+
+  <!-- ══ SCREEN 2: Csatlakozva ══ -->
+  <div id="screen-connected" class="screen">
+
+    <div class="card">
+      <div id="status-pill" class="pill pill-ok">
+        <span class="dot pulse"></span>
+        <span id="status-text">Mikrofon aktív</span>
+      </div>
+      <div style="margin-top:.9rem; display:flex; flex-direction:column; gap:.5rem;">
+        <div class="info-row">
+          <span class="lbl">Szerver</span>
+          <span class="val" id="info-server">—</span>
+        </div>
+        <div class="info-row">
+          <span class="lbl">Eszköznév</span>
+          <span class="val" id="info-name">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Saját jel (előnézet)</div>
+      <canvas id="mini-canvas"></canvas>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-accent"  id="pause-btn">⏸ Szünet</button>
+      <button class="btn btn-danger"  id="disconnect-btn">✕ Lecsatlakozás</button>
+    </div>
+
+    <p class="note" style="text-align:center;">
+      Az adatokat a tanár vetítőjén láthatod.
+    </p>
+
+  </div>
+
+</main>
+
+<!-- jsQR for QR scanning -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+// ── Helpers ───────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('screen-' + name).classList.add('active');
+}
+
+function genDeviceId() {
+  let id = localStorage.getItem('osc_device_id');
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem('osc_device_id', id); }
+  return id;
+}
+
+const deviceId = genDeviceId();
+
+// ── State ─────────────────────────────────────────────────────────────────
+let ws = null;
+let audioCtx = null;
+let processor = null;
+let stream = null;
+let paused = false;
+let miniSamples = new Float32Array(256);
+let scanStream = null;
+let scanInterval = null;
+
+// ── QR Scanner ────────────────────────────────────────────────────────────
+$('scan-btn').addEventListener('click', startScan);
+$('scan-stop-btn').addEventListener('click', stopScan);
+
+async function startScan() {
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    const video = $('qr-video');
+    video.srcObject = scanStream;
+    await video.play();
+    $('qr-video-wrap').style.display = '';
+    $('scan-btn').style.display = 'none';
+    $('scan-stop-btn').style.display = '';
+    $('qr-hint').style.display = '';
+    $('qr-hint').textContent = 'Tartsd a kamerát a QR-kód elé…';
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    scanInterval = setInterval(() => {
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height);
+      if (code) {
+        // Expect ws://... or wss://... or bare ip:port
+        let url = code.data.trim();
+        if (!url.startsWith('ws')) url = 'wss://' + url;
+        $('ip-input').value = url.replace(/^wss?:\/\//, '');
+        $('qr-hint').textContent = '✓ Beolvasva: ' + $('ip-input').value;
+        stopScan();
+      }
+    }, 200);
+  } catch {
+    $('connect-error').textContent = 'Kamera nem elérhető.';
+  }
+}
+
+function stopScan() {
+  clearInterval(scanInterval);
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  $('qr-video-wrap').style.display = 'none';
+  $('scan-btn').style.display = '';
+  $('scan-stop-btn').style.display = 'none';
+}
+
+// ── Connect ───────────────────────────────────────────────────────────────
+$('connect-btn').addEventListener('click', connect);
+
+async function connect() {
+  const raw  = $('ip-input').value.trim();
+  const name = $('name-input').value.trim() || ('Eszköz-' + deviceId.slice(0, 4));
+  $('connect-error').textContent = '';
+
+  if (!raw) { $('connect-error').textContent = 'Add meg a szerver IP-címét!'; return; }
+
+  // Build wss:// URL (server uses self-signed HTTPS → wss)
+  const wsUrl = raw.startsWith('ws') ? raw : 'wss://' + raw;
+
+  try {
+    await openWebSocket(wsUrl, name);
+    await startMicrophone();
+    $('info-server').textContent = raw;
+    $('info-name').textContent   = name;
+    showScreen('connected');
+    stopScan();
+    drawMini();
+  } catch (e) {
+    $('connect-error').textContent = 'Nem sikerült csatlakozni: ' + e.message;
+  }
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+function openWebSocket(url, name) {
+  return new Promise((resolve, reject) => {
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+    const timeout = setTimeout(() => reject(new Error('Időtúllépés')), 8000);
+    ws.onopen = () => {
+      clearTimeout(timeout);
+      ws.send(JSON.stringify({ type: 'hello', deviceId, deviceName: name }));
+      resolve();
+    };
+    ws.onerror = () => { clearTimeout(timeout); reject(new Error('WebSocket hiba')); };
+    ws.onclose = () => { if (audioCtx) onDisconnected(); };
+    ws.onmessage = (e) => handleServerMsg(JSON.parse(e.data));
+  });
+}
+
+function handleServerMsg(msg) {
+  if (msg.type === 'pause')  { paused = true;  setStatus('Szüneteltetve', 'warn'); }
+  if (msg.type === 'resume') { paused = false; setStatus('Mikrofon aktív', 'ok'); }
+  if (msg.type === 'rename') { $('info-name').textContent = msg.name; }
+}
+
+// ── Microphone ────────────────────────────────────────────────────────────
+async function startMicrophone() {
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = audioCtx.createMediaStreamSource(stream);
+
+  // Use ScriptProcessorNode for widest compatibility
+  const bufSize = 2048;
+  processor = audioCtx.createScriptProcessor(bufSize, 1, 1);
+  source.connect(processor);
+  processor.connect(audioCtx.destination);
+
+  let sendBuf = [];
+  const SEND_INTERVAL_MS = 33; // ~30/s
+
+  processor.onaudioprocess = (e) => {
+    const data = e.inputBuffer.getChannelData(0);
+    // Update mini preview (decimated)
+    const step = Math.max(1, Math.floor(data.length / 256));
+    for (let i = 0; i < 256; i++) miniSamples[i] = data[i * step] ?? 0;
+
+    if (paused || !ws || ws.readyState !== WebSocket.OPEN) return;
+    sendBuf.push(...data);
+    if (sendBuf.length >= audioCtx.sampleRate * SEND_INTERVAL_MS / 1000) {
+      ws.send(JSON.stringify({
+        type: 'audio',
+        deviceId,
+        t: Date.now(),
+        samples: Array.from(sendBuf),
+        sampleRate: audioCtx.sampleRate,
+      }));
+      sendBuf = [];
+    }
+  };
+}
+
+// ── Mini canvas ───────────────────────────────────────────────────────────
+function drawMini() {
+  const canvas = $('mini-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth * devicePixelRatio;
+  const H = canvas.offsetHeight * devicePixelRatio;
+  canvas.width = W; canvas.height = H;
+
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#4db6ac';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const n = miniSamples.length;
+  for (let i = 0; i < n; i++) {
+    const x = (i / n) * W;
+    const y = (0.5 - miniSamples[i] * 0.45) * H;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  requestAnimationFrame(drawMini);
+}
+
+// ── Pause / Disconnect ────────────────────────────────────────────────────
+$('pause-btn').addEventListener('click', () => {
+  paused = !paused;
+  $('pause-btn').textContent = paused ? '▶ Folytatás' : '⏸ Szünet';
+  setStatus(paused ? 'Szüneteltetve' : 'Mikrofon aktív', paused ? 'warn' : 'ok');
+});
+
+$('disconnect-btn').addEventListener('click', () => {
+  if (ws) ws.close();
+  onDisconnected();
+});
+
+function onDisconnected() {
+  if (processor) { processor.disconnect(); processor = null; }
+  if (audioCtx)  { audioCtx.close(); audioCtx = null; }
+  if (stream)    { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  ws = null; paused = false;
+  $('pause-btn').textContent = '⏸ Szünet';
+  showScreen('connect');
+}
+
+function setStatus(text, type) {
+  $('status-text').textContent = text;
+  $('status-pill').className = 'pill pill-' + type;
+}
+
+// ── Service Worker ────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
