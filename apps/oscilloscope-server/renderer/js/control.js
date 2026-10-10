@@ -6,7 +6,6 @@ const authPw      = document.getElementById('auth-pw');
 const authBtn     = document.getElementById('auth-btn');
 const authError   = document.getElementById('auth-error');
 const deviceList  = document.getElementById('device-list');
-const csvStatus   = document.getElementById('csv-status');
 const pwStatus    = document.getElementById('pw-status');
 
 // ── Auth ───────────────────────────────────────────────────────────────────
@@ -75,23 +74,6 @@ function renderDevices(devices) {
 // Live device updates from server
 window.api.onControlDevices((devices) => {
   if (authToken) renderDevices(devices);
-});
-
-// ── CSV ────────────────────────────────────────────────────────────────────
-document.getElementById('export-btn').addEventListener('click', async () => {
-  csvStatus.className = 'status-msg';
-  csvStatus.textContent = 'Mentés…';
-  const res = await window.api.exportCsv(authToken);
-  csvStatus.className = 'status-msg ' + (res.ok ? 'ok-msg' : 'error-msg');
-  csvStatus.textContent = res.ok ? 'Sikeresen mentve.' : ('Hiba: ' + (res.error || ''));
-});
-
-document.getElementById('import-btn').addEventListener('click', async () => {
-  csvStatus.className = 'status-msg';
-  csvStatus.textContent = 'Betöltés…';
-  const res = await window.api.importCsv(authToken);
-  csvStatus.className = 'status-msg ' + (res.ok ? 'ok-msg' : 'error-msg');
-  csvStatus.textContent = res.ok ? 'Betöltve és visszajátszva.' : ('Hiba: ' + (res.error || ''));
 });
 
 // ── Password change ────────────────────────────────────────────────────────

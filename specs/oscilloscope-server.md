@@ -36,8 +36,6 @@ apps/oscilloscope-server/
   - `devices:list` → eszközlista
   - `device:toggle` → eszköz láthatóság ki/be
   - `device:rename` → átnevezés
-  - `session:export-csv` → CSV letöltés
-  - `session:import-csv` → CSV betöltés + visszajátszás
   - `password:verify` → jelszó ellenőrzés
   - `password:change` → jelszó módosítás
 
@@ -79,12 +77,6 @@ Szerver → display üzenetek:
 
 ## Munkamenet tároló (sessionStore.js)
 - `Map<deviceId, { meta, ringBuffer }>` — gyűrűpuffer, max 10 másodperc @ 44100 Hz
-- CSV export: fejléc sor + minden minta egy sor
-  ```
-  timestamp_ms,device_id,device_name,sample_index,value
-  1728555600123,abc123,Ablak melletti pad,0,0.012
-  ```
-- CSV import: beolvassa, visszajátssza a display felé (szimulált `frame` üzenetek)
 
 ## Indítóképernyő (launcher.html)
 - Port mező (default: 3443)

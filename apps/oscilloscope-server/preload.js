@@ -11,10 +11,6 @@ contextBridge.exposeInMainWorld('api', {
   deviceToggle: (token, deviceId)    => ipcRenderer.invoke('device:toggle',  { token, deviceId }),
   deviceRename: (token, deviceId, n) => ipcRenderer.invoke('device:rename',  { token, deviceId, name: n }),
 
-  // Session data
-  exportCsv: (token) => ipcRenderer.invoke('session:export-csv', { token }),
-  importCsv: (token) => ipcRenderer.invoke('session:import-csv', { token }),
-
   // Auth
   passwordVerify: (pw)        => ipcRenderer.invoke('password:verify', { password: pw }),
   passwordChange: (token, pw) => ipcRenderer.invoke('password:change', { token, newPassword: pw }),

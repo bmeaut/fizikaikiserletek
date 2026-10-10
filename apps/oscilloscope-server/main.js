@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const { startServer, stopServer } = require('./server/server');
@@ -105,34 +105,6 @@ ipcMain.handle('device:rename', (_, { token, deviceId, name }) => {
   if (!verifyToken(token)) return { ok: false };
   const { renameDevice } = require('./server/sessionStore');
   return { ok: true, devices: renameDevice(deviceId, name) };
-});
-
-ipcMain.handle('session:export-csv', async (_, { token }) => {
-  if (!verifyToken(token)) return { ok: false };
-  const { exportCsv } = require('./server/sessionStore');
-  const csv = exportCsv();
-  const { filePath } = await dialog.showSaveDialog({
-    title: 'CSV mentése',
-    defaultPath: `oscilloscope-${Date.now()}.csv`,
-    filters: [{ name: 'CSV', extensions: ['csv'] }],
-  });
-  if (!filePath) return { ok: false, error: 'Mégse' };
-  require('fs').writeFileSync(filePath, csv, 'utf8');
-  return { ok: true };
-});
-
-ipcMain.handle('session:import-csv', async (_, { token }) => {
-  if (!verifyToken(token)) return { ok: false };
-  const { filePaths } = await dialog.showOpenDialog({
-    title: 'CSV betöltése',
-    filters: [{ name: 'CSV', extensions: ['csv'] }],
-    properties: ['openFile'],
-  });
-  if (!filePaths || !filePaths.length) return { ok: false, error: 'Mégse' };
-  const csv = require('fs').readFileSync(filePaths[0], 'utf8');
-  const { importCsv } = require('./server/sessionStore');
-  importCsv(csv);
-  return { ok: true };
 });
 
 ipcMain.handle('password:verify', async (_, { password }) => {
