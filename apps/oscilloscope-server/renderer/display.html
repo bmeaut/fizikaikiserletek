@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Oszcilloszkóp — Projektor nézet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0a0a14; color: #e0e0e0;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Header bar ── */
+    #topbar {
+      background: #12122a; border-bottom: 1px solid #222;
+      padding: .5rem 1.25rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #topbar h1 { font-size: 1rem; color: #9fa8da; }
+    #topbar .meta { font-size: .8rem; color: #666; }
+    #device-count { font-weight: 700; color: #7986cb; }
+
+    /* ── QR overlay button ── */
+    #qr-btn {
+      background: #1e1e3a; border: 1px solid #444; border-radius: 8px;
+      padding: .35rem .75rem; font-size: .8rem; color: #9fa8da; cursor: pointer;
+    }
+    #qr-btn:hover { background: #2a2a4a; }
+
+    /* ── QR Lightbox ── */
+    #qr-lightbox {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.92); z-index: 100;
+      flex-direction: column; align-items: center; justify-content: center; gap: 1rem;
+    }
+    #qr-lightbox.open { display: flex; }
+    #qr-lightbox img { width: min(70vw,70vh); height: min(70vw,70vh); border-radius: 12px; image-rendering: pixelated; }
+    #qr-url { font-size: 1rem; color: #9fa8da; }
+    #qr-app-url { font-size: .85rem; color: #666; }
+    #qr-close { position: absolute; top: 1rem; right: 1.5rem; font-size: 1.5rem; cursor: pointer; color: #aaa; background: none; border: none; }
+
+    /* ── Main panels ── */
+    #panels {
+      flex: 1; display: grid; grid-template-rows: 1fr 1fr;
+      padding: .75rem; gap: .75rem; overflow: hidden;
+    }
+    .panel {
+      background: #0f0f1e; border: 1px solid #1e1e3a; border-radius: 10px;
+      position: relative; overflow: hidden;
+    }
+    .panel-label {
+      position: absolute; top: .5rem; left: .75rem;
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #444;
+      z-index: 1;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* ── Legend ── */
+    #legend {
+      flex-shrink: 0; padding: .4rem 1rem;
+      display: flex; gap: 1.25rem; flex-wrap: wrap;
+      background: #0d0d1a; border-top: 1px solid #1e1e3a;
+      min-height: 2rem; align-items: center;
+    }
+    .legend-item { display: flex; align-items: center; gap: .4rem; font-size: .8rem; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    #no-devices { font-size: .85rem; color: #444; }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>🎙️ Hanghullám-oszcilloszkóp</h1>
+  <div class="meta">Csatlakozott eszközök: <span id="device-count">0</span></div>
+  <button id="qr-btn">QR-kód megjelenítése</button>
+</div>
+
+<div id="panels">
+  <div class="panel" id="panel-wave">
+    <div class="panel-label">Hullámforma</div>
+    <canvas id="wave-canvas"></canvas>
+  </div>
+  <div class="panel" id="panel-fft">
+    <div class="panel-label">Frekvenciaspektrum (FFT)</div>
+    <canvas id="fft-canvas"></canvas>
+  </div>
+</div>
+
+<div id="legend">
+  <span id="no-devices">Várakozás eszközökre…</span>
+</div>
+
+<div id="qr-lightbox">
+  <button id="qr-close">✕</button>
+  <img id="qr-img" src="" alt="QR kód" />
+  <div id="qr-url"></div>
+  <div id="qr-app-url"></div>
+</div>
+
+<script src="js/display.js"></script>
+</body>
+</html>
