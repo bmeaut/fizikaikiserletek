@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Oszcilloszkóp Szerver — Indítás</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e; color: #e0e0e0;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 2rem;
+      gap: 1.5rem;
+    }
+    h1 { font-size: 1.4rem; color: #9fa8da; text-align: center; }
+    .card {
+      background: #1e1e3a; border: 1px solid #333; border-radius: 14px;
+      padding: 1.5rem; width: 100%; max-width: 380px;
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+    label { font-size: .82rem; color: #9e9e9e; display: block; margin-bottom: .3rem; }
+    input[type=text], input[type=number], input[type=password] {
+      width: 100%; padding: .6rem .85rem; border: 1px solid #444;
+      border-radius: 8px; font-size: .95rem; background: #12122a; color: #e0e0e0;
+    }
+    input:focus { outline: 2px solid #7986cb; border-color: transparent; }
+    .btn {
+      width: 100%; padding: .75rem; border: none; border-radius: 9px;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-primary { background: #3949ab; color: #fff; }
+    .btn-primary:hover { background: #5c6bc0; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .status { font-size: .85rem; color: #aaa; text-align: center; min-height: 1.2em; }
+    .error  { color: #ef9a9a; }
+    .first-run-notice {
+      background: #2a1a0a; border: 1px solid #fb8c00; border-radius: 8px;
+      padding: .75rem 1rem; font-size: .82rem; color: #ffcc80; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎙️ Oszcilloszkóp Szerver</h1>
+
+  <div class="card">
+    <div id="first-run-notice" class="first-run-notice" style="display:none;">
+      ⚠️ Első indítás: adj meg egy jelszót a tanári vezérlőpult védelméhez.
+    </div>
+
+    <div>
+      <label for="port">Port</label>
+      <input type="number" id="port" value="3443" min="1024" max="65535" />
+    </div>
+    <div id="pw-section">
+      <label for="password">Tanári jelszó</label>
+      <input type="password" id="password" placeholder="Add meg a jelszót…" />
+    </div>
+
+    <button class="btn btn-primary" id="start-btn">▶ Szerver indítása</button>
+    <p class="status" id="status"></p>
+  </div>
+
+  <script>
+    (async () => {
+      const firstRun = await window.api.serverIsFirstRun();
+      const notice   = document.getElementById('first-run-notice');
+      const pwInput  = document.getElementById('password');
+      if (firstRun) { notice.style.display = ''; }
+      else { document.querySelector('label[for=password]').textContent = 'Jelszó (megerősítés)'; }
+
+      document.getElementById('start-btn').addEventListener('click', async () => {
+        const port     = parseInt(document.getElementById('port').value);
+        const password = pwInput.value.trim();
+        const status   = document.getElementById('status');
+        const btn      = document.getElementById('start-btn');
+
+        if (firstRun && !password) {
+          status.className = 'status error';
+          status.textContent = 'Adj meg egy jelszót!';
+          return;
+        }
+
+        btn.disabled = true;
+        status.className = 'status';
+        status.textContent = 'Indítás…';
+
+        const res = await window.api.serverStart({ port, password: firstRun ? password : undefined });
+        if (res.ok) {
+          status.textContent = `Fut: https://${res.ip}:${res.port}`;
+        } else {
+          btn.disabled = false;
+          status.className = 'status error';
+          status.textContent = 'Hiba: ' + res.error;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

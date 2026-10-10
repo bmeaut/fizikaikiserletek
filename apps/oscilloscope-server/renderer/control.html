@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Tanári vezérlőpult</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #121220; color: #e0e0e0;
+      padding: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem;
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.1rem; color: #9fa8da; }
+    .card {
+      background: #1e1e3a; border: 1px solid #2a2a4a; border-radius: 12px;
+      padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: .85rem;
+    }
+    .section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; color: #666; }
+    label { font-size: .82rem; color: #9e9e9e; display: block; margin-bottom: .3rem; }
+    input[type=text], input[type=password] {
+      width: 100%; padding: .55rem .8rem; border: 1px solid #333;
+      border-radius: 7px; font-size: .9rem; background: #12122a; color: #e0e0e0;
+    }
+    input:focus { outline: 2px solid #7986cb; border-color: transparent; }
+    .btn {
+      padding: .6rem 1.1rem; border: none; border-radius: 8px;
+      font-size: .88rem; font-weight: 600; cursor: pointer;
+    }
+    .btn:active { opacity: .75; }
+    .btn-primary { background: #3949ab; color: #fff; }
+    .btn-accent  { background: #00897b; color: #fff; }
+    .btn-danger  { background: #c62828; color: #fff; }
+    .btn-ghost   { background: transparent; color: #9e9e9e; border: 1px solid #333; }
+    .btn-row { display: flex; gap: .6rem; flex-wrap: wrap; }
+    .status-msg { font-size: .8rem; color: #aaa; min-height: 1.1em; }
+    .error-msg  { color: #ef9a9a; }
+    .ok-msg     { color: #a5d6a7; }
+
+    /* ── Auth overlay ── */
+    #auth-overlay {
+      position: fixed; inset: 0; background: #0a0a14;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 1rem; z-index: 10; padding: 2rem;
+    }
+    #auth-overlay h2 { color: #9fa8da; }
+    #auth-overlay input { max-width: 300px; }
+    #auth-overlay .btn { min-width: 200px; }
+
+    /* ── Device list ── */
+    #device-list { display: flex; flex-direction: column; gap: .6rem; }
+    .device-row {
+      background: #12122a; border: 1px solid #2a2a4a; border-radius: 9px;
+      padding: .65rem 1rem; display: flex; align-items: center; gap: .75rem;
+    }
+    .dev-color { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .dev-name  { flex: 1; font-size: .9rem; }
+    .dev-name-input {
+      flex: 1; background: #1e1e3a; border: 1px solid #333; border-radius: 6px;
+      padding: .3rem .6rem; color: #e0e0e0; font-size: .9rem; display: none;
+    }
+    .dev-hidden { opacity: .45; }
+    .btn-sm { padding: .3rem .65rem; font-size: .78rem; }
+  </style>
+</head>
+<body>
+
+<!-- Auth overlay -->
+<div id="auth-overlay">
+  <h2>🔒 Tanári vezérlőpult</h2>
+  <div>
+    <label for="auth-pw">Jelszó</label>
+    <input type="password" id="auth-pw" placeholder="Jelszó…" />
+  </div>
+  <button class="btn btn-primary" id="auth-btn">Feloldás</button>
+  <p class="status-msg error-msg" id="auth-error"></p>
+</div>
+
+<h1>Tanári vezérlőpult</h1>
+
+<!-- Devices -->
+<div class="card">
+  <div class="section-title">Csatlakozott eszközök</div>
+  <div id="device-list"><p style="color:#666; font-size:.85rem;">Nincs csatlakozott eszköz.</p></div>
+</div>
+
+<!-- Data -->
+<div class="card">
+  <div class="section-title">Adatok</div>
+  <div class="btn-row">
+    <button class="btn btn-accent" id="export-btn">⬇ CSV letöltése</button>
+    <button class="btn btn-ghost"  id="import-btn">⬆ CSV betöltése</button>
+  </div>
+  <p class="status-msg" id="csv-status"></p>
+</div>
+
+<!-- Password -->
+<div class="card">
+  <div class="section-title">Jelszó módosítása</div>
+  <div>
+    <label for="new-pw">Új jelszó</label>
+    <input type="password" id="new-pw" placeholder="Új jelszó…" />
+  </div>
+  <div>
+    <label for="new-pw2">Megerősítés</label>
+    <input type="password" id="new-pw2" placeholder="Ismételd meg…" />
+  </div>
+  <button class="btn btn-primary" id="pw-change-btn">Jelszó módosítása</button>
+  <p class="status-msg" id="pw-status"></p>
+</div>
+
+<script src="js/control.js"></script>
+</body>
+</html>
