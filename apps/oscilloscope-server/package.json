@@ -1,0 +1,33 @@
+{
+  "name": "oscilloscope-server",
+  "version": "1.0.0",
+  "description": "Hanghullám-oszcilloszkóp tanári szerver",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "hu.fizikaikiserletek.oscilloscope",
+    "productName": "Oszcilloszkóp Szerver",
+    "win": {
+      "target": "nsis",
+      "icon": "icons/icon.ico"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/.cache"
+    ]
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
+    "node-forge": "^1.3.1",
+    "qrcode": "^1.5.3",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}
