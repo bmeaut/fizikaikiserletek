@@ -13,7 +13,8 @@ const qrAppUrl   = document.getElementById('qr-app-url');
 const qrClose    = document.getElementById('qr-close');
 const devCount   = document.getElementById('device-count');
 
-let latestFrame = null;
+let latestFrame   = null;
+let knownDevices  = []; // full device list from server (includes visible flag)
 
 // ── Resize canvases to physical pixels ────────────────────────────────────
 function resizeCanvas(canvas) {
@@ -177,10 +178,10 @@ requestAnimationFrame(render);
 // ── IPC from main process ──────────────────────────────────────────────────
 window.api.onDisplayFrame((frame) => {
   latestFrame = frame;
-  updateLegend(frame.devices);
 });
 
 window.api.onDevicesUpdate((devices) => {
+  knownDevices = devices;
   updateLegend(devices);
   if (latestFrame) {
     latestFrame.devices = latestFrame.devices.filter(
