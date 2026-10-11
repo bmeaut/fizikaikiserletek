@@ -33,10 +33,14 @@
     .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
     .status { font-size: .85rem; color: #aaa; text-align: center; min-height: 1.2em; }
     .error  { color: #ef9a9a; }
-    .first-run-notice {
-      background: #2a1a0a; border: 1px solid #fb8c00; border-radius: 8px;
-      padding: .75rem 1rem; font-size: .82rem; color: #ffcc80; line-height: 1.5;
+    .ca-badge {
+      padding: .55rem 1rem; border-radius: 8px; font-size: .82rem;
+      line-height: 1.5; display: flex; align-items: flex-start; gap: .5rem;
     }
+    .ca-trusted  { background: #1b3a1f; color: #a5d6a7; border: 1px solid #2e7d32; }
+    .ca-fallback { background: #3e2000; color: #ffcc80; border: 1px solid #fb8c00; }
+    .ca-pending  { background: #1a1a3a; color: #9fa8da; border: 1px solid #3949ab; }
+    .ca-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
   </style>
 </head>
 <body>
@@ -45,6 +49,11 @@
   <div class="card">
     <div id="first-run-notice" class="first-run-notice" style="display:none;">
       ⚠️ Első indítás: adj meg egy jelszót a tanári vezérlőpult védelméhez.
+    </div>
+
+    <div id="ca-badge" class="ca-badge ca-pending">
+      <span class="ca-icon">⏳</span>
+      <span id="ca-text">Tanúsítvány telepítése folyamatban…</span>
     </div>
 
     <div>
@@ -61,12 +70,37 @@
   </div>
 
   <script>
+    function setCaBadge(status) {
+      const badge = document.getElementById('ca-badge');
+      const text  = document.getElementById('ca-text');
+      badge.className = 'ca-badge';
+      if (status === 'trusted') {
+        badge.classList.add('ca-trusted');
+        badge.querySelector('.ca-icon').textContent = '🔒';
+        text.textContent = 'Tanúsítvány telepítve — a tanulóknak nem jelenik meg figyelmeztetés.';
+      } else if (status === 'fallback') {
+        badge.classList.add('ca-fallback');
+        badge.querySelector('.ca-icon').textContent = '⚠️';
+        text.textContent = 'Tanúsítvány nem telepíthető (nincs rendszergazdai jog). ' +
+          'A tanulóknak egyszer el kell fogadniuk a böngésző figyelmeztetését.';
+      } else {
+        badge.classList.add('ca-pending');
+        badge.querySelector('.ca-icon').textContent = '⏳';
+        text.textContent = 'Tanúsítvány telepítése folyamatban…';
+      }
+    }
+
     (async () => {
       const firstRun = await window.api.serverIsFirstRun();
       const notice   = document.getElementById('first-run-notice');
       const pwInput  = document.getElementById('password');
       if (firstRun) { notice.style.display = ''; }
       else { document.querySelector('label[for=password]').textContent = 'Jelszó (megerősítés)'; }
+
+      // Show current CA status immediately, then listen for updates
+      const status = await window.api.caStatus();
+      setCaBadge(status);
+      window.api.onCaStatus(setCaBadge);
 
       document.getElementById('start-btn').addEventListener('click', async () => {
         const port     = parseInt(document.getElementById('port').value);

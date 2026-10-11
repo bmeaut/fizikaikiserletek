@@ -1,12 +1,14 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const { startServer, stopServer } = require('./server/server');
 const { verifyPassword, changePassword, isFirstRun } = require('./server/auth');
+const { ensureCerts, isCaInstalled, tryInstallCaElevated } = require('./server/ca');
 
 let launcherWin = null;
 let displayWin  = null;
 let controlWin  = null;
+let caStatus    = 'unknown'; // 'trusted' | 'fallback' | 'pending'
 
 function createLauncher() {
   launcherWin = new BrowserWindow({
@@ -56,7 +58,23 @@ function createControl() {
   });
 }
 
-app.whenReady().then(createLauncher);
+app.whenReady().then(async () => {
+  // Ensure certs exist before opening the launcher
+  ensureCerts();
+
+  if (isCaInstalled()) {
+    caStatus = 'trusted';
+    createLauncher();
+  } else {
+    // Attempt elevated CA install once; show launcher regardless of outcome
+    caStatus = 'pending';
+    createLauncher(); // open launcher immediately so teacher isn't waiting
+    tryInstallCaElevated().then((result) => {
+      caStatus = result.ok ? 'trusted' : 'fallback';
+      if (launcherWin) launcherWin.webContents.send('ca:status', caStatus);
+    });
+  }
+});
 app.on('window-all-closed', () => { stopServer(); app.quit(); });
 
 // ── IPC handlers ──────────────────────────────────────────────────────────
@@ -88,6 +106,7 @@ ipcMain.handle('server:stop', () => {
 });
 
 ipcMain.handle('server:is-first-run', () => isFirstRun());
+ipcMain.handle('ca:status', () => caStatus);
 
 ipcMain.handle('devices:list', (_, { token }) => {
   if (!verifyToken(token)) return { ok: false };
