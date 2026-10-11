@@ -270,11 +270,17 @@ async function startScan() {
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(imgData.data, imgData.width, imgData.height);
       if (code) {
-        // Expect ws://... or wss://... or bare ip:port
+        // QR encodes https://IP:port/ — extract just the host:port for the input
         let url = code.data.trim();
+<<<<<<< Updated upstream
         if (!url.startsWith('ws')) url = 'wss://' + url;
         $('ip-input').value = url.replace(/^wss?:\/\//, '');
         $('qr-hint').textContent = '✓ Beolvasva: ' + $('ip-input').value;
+=======
+        const host = url.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '').replace(/\/.*$/, '');
+        $('ip-input').value = host;
+        $('qr-hint').textContent = '✓ Beolvasva: ' + host;
+>>>>>>> Stashed changes
         stopScan();
       }
     }, 200);
