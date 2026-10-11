@@ -3,7 +3,7 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const { startServer, stopServer } = require('./server/server');
 const { verifyPassword, changePassword, isFirstRun } = require('./server/auth');
-const { ensureCerts, isCaInstalled, tryInstallCaElevated } = require('./server/ca');
+const { ensureCerts, regenerateServerCert, isCaInstalled, tryInstallCaElevated } = require('./server/ca');
 
 let launcherWin = null;
 let displayWin  = null;
@@ -59,8 +59,9 @@ function createControl() {
 }
 
 app.whenReady().then(async () => {
-  // Ensure certs exist before opening the launcher
+  // Ensure certs exist and are up to date for the current network
   ensureCerts();
+  regenerateServerCert(); // refresh server cert IPs on every launch
 
   if (isCaInstalled()) {
     caStatus = 'trusted';
