@@ -119,15 +119,6 @@
 
     .note { font-size: .78rem; color: var(--text-m); line-height: 1.5; }
     .error-msg { font-size: .85rem; color: var(--danger); min-height: 1.2em; }
-    .cert-hint {
-      margin-top: .6rem; padding: .6rem .85rem;
-      background: #fff3e0; border: 1px solid #fb8c00; border-radius: 8px;
-      font-size: .82rem; line-height: 1.5; color: #5d3a00;
-    }
-    @media (prefers-color-scheme: dark) {
-      .cert-hint { background: #3e2000; border-color: #fb8c00; color: #ffcc80; }
-    }
-    .cert-hint a { color: inherit; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -149,10 +140,6 @@
       <div class="field">
         <label for="ip-input">Szerver WebSocket URL</label>
         <input type="text" id="ip-input" placeholder="pl. 192.168.1.5:3443" autocomplete="off" />
-      </div>
-      <div id="cert-hint" class="cert-hint" style="display:none;">
-        ⚠️ Első csatlakozás előtt <a id="cert-link" href="#" target="_blank">nyisd meg ezt a linket</a>,
-        fogadd el a biztonsági figyelmeztetést, majd gyere vissza és csatlakozz.
       </div>
       <p class="note" style="margin-top:.5rem;">
         A tanár a szerverindítás után QR-kódot mutat — olvasd be alább,
@@ -243,18 +230,6 @@ function genDeviceId() {
 
 const deviceId = genDeviceId();
 
-// ── Cert hint — show when IP is entered ───────────────────────────────────
-function updateCertHint() {
-  const raw = $('ip-input').value.trim();
-  const hint = $('cert-hint');
-  const link = $('cert-link');
-  if (!raw) { hint.style.display = 'none'; return; }
-  const host = raw.replace(/^wss?:\/\//, '');
-  link.href = `https://${host}`;
-  hint.style.display = '';
-}
-$('ip-input').addEventListener('input', updateCertHint);
-
 // ── State ─────────────────────────────────────────────────────────────────
 let ws = null;
 let audioCtx = null;
@@ -264,6 +239,8 @@ let paused = false;
 let miniSamples = new Float32Array(256);
 let scanStream = null;
 let scanInterval = null;
+let certWin = null;         // the cert-acceptance popup
+let pendingConnect = null;  // { httpsBase, wsUrl, name } waiting for cert
 
 // ── QR Scanner ────────────────────────────────────────────────────────────
 $('scan-btn').addEventListener('click', startScan);
@@ -298,7 +275,6 @@ async function startScan() {
         if (!url.startsWith('ws')) url = 'wss://' + url;
         $('ip-input').value = url.replace(/^wss?:\/\//, '');
         $('qr-hint').textContent = '✓ Beolvasva: ' + $('ip-input').value;
-        updateCertHint();
         stopScan();
       }
     }, 200);
@@ -325,13 +301,67 @@ async function connect() {
 
   if (!raw) { $('connect-error').textContent = 'Add meg a szerver IP-címét!'; return; }
 
-  // Build wss:// URL (server uses self-signed HTTPS → wss)
-  const wsUrl = raw.startsWith('ws') ? raw : 'wss://' + raw;
+  const host      = raw.replace(/^wss?:\/\//, '');
+  const httpsBase = 'https://' + host;
+  const wsUrl     = 'wss://' + host + (host.includes('/ws') ? '' : '/ws');
 
+  // Try to reach /ping — if it works, cert is already trusted, connect directly
+  const trusted = await pingServer(httpsBase);
+  if (trusted) {
+    doConnect(wsUrl, httpsBase, name);
+    return;
+  }
+
+  // Cert not yet trusted — open the server root in a popup to trigger the warning
+  pendingConnect = { httpsBase, wsUrl, name };
+  certWin = window.open(httpsBase + '/', 'cert-accept',
+    'width=420,height=340,toolbar=no,menubar=no,location=yes');
+
+  // Listen for the postMessage from the server's landing page
+  window.addEventListener('message', onCertMessage);
+
+  // Also poll /ping as fallback (in case postMessage is blocked)
+  pollUntilPing(httpsBase);
+}
+
+function onCertMessage(e) {
+  if (e.data !== 'cert-accepted') return;
+  window.removeEventListener('message', onCertMessage);
+  if (certWin && !certWin.closed) certWin.close();
+  if (pendingConnect) {
+    const { wsUrl, httpsBase, name } = pendingConnect;
+    pendingConnect = null;
+    doConnect(wsUrl, httpsBase, name);
+  }
+}
+
+function pingServer(httpsBase) {
+  return fetch(httpsBase + '/ping', { mode: 'cors' })
+    .then(r => r.ok)
+    .catch(() => false);
+}
+
+function pollUntilPing(httpsBase) {
+  const interval = setInterval(async () => {
+    if (!pendingConnect) { clearInterval(interval); return; }
+    const ok = await pingServer(httpsBase);
+    if (ok) {
+      clearInterval(interval);
+      window.removeEventListener('message', onCertMessage);
+      if (certWin && !certWin.closed) certWin.close();
+      const { wsUrl, name } = pendingConnect;
+      pendingConnect = null;
+      doConnect(wsUrl, httpsBase, name);
+    }
+  }, 1000);
+}
+
+async function doConnect(wsUrl, httpsBase, name) {
+  $('connect-error').textContent = '';
   try {
     await openWebSocket(wsUrl, name);
     await startMicrophone();
-    $('info-server').textContent = raw;
+    $('info-server').textContent = httpsBase;
     $('info-name').textContent   = name;
     showScreen('connected');
     stopScan();
