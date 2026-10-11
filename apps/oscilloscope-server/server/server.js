@@ -32,8 +32,30 @@ async function startServer(port, password) {
   const pwaPath = path.join(__dirname, '..', '..', 'oscilloscope');
   app.use('/app', express.static(pwaPath));
 
-  // Redirect root to student app
-  app.get('/', (req, res) => res.redirect('/app/'));
+  // Ping endpoint — student PWA polls this to detect when cert is accepted
+  app.get('/ping', (req, res) => res.json({ ok: true }));
+
+  // Root: cert-acceptance landing page that auto-closes after success
+  app.get('/', (req, res) => res.send(`<!DOCTYPE html>
+<html lang="hu"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Csatlakozás…</title>
+<style>
+  body { font-family: system-ui,sans-serif; background:#1a1a2e; color:#e0e0e0;
+         display:flex; flex-direction:column; align-items:center;
+         justify-content:center; min-height:100vh; gap:1rem; padding:2rem; text-align:center; }
+  h1 { font-size:1.3rem; color:#9fa8da; }
+  p  { color:#888; font-size:.9rem; line-height:1.5; }
+</style>
+</head><body>
+<h1>✅ Tanúsítvány elfogadva</h1>
+<p>Ezt az ablakot bezárhatod és visszatérhetsz az alkalmazáshoz.</p>
+<script>
+  // Signal opener (student PWA) that cert is now trusted, then close
+  if (window.opener) { try { window.opener.postMessage('cert-accepted', '*'); } catch(e){} }
+  setTimeout(() => window.close(), 800);
+</script>
+</body></html>`));
 
   httpsServer = https.createServer({ cert, key }, app);
   wss = new WebSocketServer({ server: httpsServer, path: '/ws' });
