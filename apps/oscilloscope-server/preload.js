@@ -2,9 +2,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   // Server control
-  serverStart:     (opts)  => ipcRenderer.invoke('server:start', opts),
-  serverStop:      ()      => ipcRenderer.invoke('server:stop'),
+  serverStart:      (opts) => ipcRenderer.invoke('server:start', opts),
+  serverStop:       ()     => ipcRenderer.invoke('server:stop'),
   serverIsFirstRun: ()     => ipcRenderer.invoke('server:is-first-run'),
+  caStatus:         ()     => ipcRenderer.invoke('ca:status'),
+  onCaStatus:       (cb)   => ipcRenderer.on('ca:status', (_, s) => cb(s)),
 
   // Devices
   devicesList:  (token)              => ipcRenderer.invoke('devices:list',   { token }),
