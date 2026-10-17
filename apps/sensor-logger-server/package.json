@@ -1,0 +1,26 @@
+{
+  "name": "sensor-logger-server",
+  "version": "1.0.0",
+  "description": "Sensor Logger adatok fogadása és megjelenítése",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "hu.fizikaikiserletek.sensorlogger",
+    "productName": "Sensor Logger Szerver",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "files": ["**/*", "!node_modules/.cache"]
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}

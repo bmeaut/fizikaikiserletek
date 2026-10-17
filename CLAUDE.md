@@ -20,7 +20,8 @@ fizikaikiserletek/
 ├── apps/
 │   ├── surlodas/           # Adhesion coefficient measurer (standalone PWA)
 │   ├── oscilloscope/       # Sound oscilloscope student PWA (connects to server)
-│   └── oscilloscope-server/ # Teacher Electron app (Node.js + WebSocket server)
+│   ├── oscilloscope-server/  # Teacher Electron app (Node.js + WebSocket server)
+│   └── sensor-logger-server/ # Sensor Logger HTTP Push receiver (Electron, plain HTTP)
 ├── specs/                  # Open specifications for every app + the hub
 └── experiment-ideas/       # Research notes on future experiments
 ```
