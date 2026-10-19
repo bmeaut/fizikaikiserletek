@@ -1,155 +1,391 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" data-theme="dark">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Sensor Logger Szerver</title>
+  <title>Sensor Monitor</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg:        #0f0f1a;
-      --surface:   #1a1a2e;
-      --surface2:  #22223a;
-      --border:    #2a2a4a;
-      --text:      #e0e0e0;
-      --text-m:    #888;
-      --primary:   #7986cb;
-      --accent:    #4db6ac;
-      --danger:    #ef9a9a;
-      --radius:    10px;
-    }
-    html, body { width: 100%; height: 100%; overflow: hidden; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--bg); color: var(--text);
-      display: flex; flex-direction: column;
-    }
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+:root {
+  --ground:   #0f0f1a;
+  --surface:  #14141f;
+  --raised:   #1c1c2a;
+  --active:   #242436;
+  --border:   #1e1e30;
+  --rule:     #191926;
+  --control:  #2e2e44;
+  --text:     #e8e8f0;
+  --muted:    #a0a0b8;
+  --faint:    #6a6a80;
+  --primary:  #e8e8f0;
+  --accent:   #4db6ac;
+  --negative: #e5566f;
+  --positive: #4db6ac;
+  --grid:     #1e1e2e;
+  --radius-card: 6px;
+  --radius-control: 5px;
+  --gap: 12px;
+  --card-pad: 14px;
+  --font: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+[data-theme="light"] {
+  --ground:   #f4f5f8;
+  --surface:  #ffffff;
+  --raised:   #f8f9fb;
+  --active:   #eeeef4;
+  --border:   #e0e0ea;
+  --rule:     #ebebf2;
+  --control:  #d0d0de;
+  --text:     #111118;
+  --muted:    #5a5a72;
+  --faint:    #8888a0;
+  --primary:  #111118;
+  --accent:   #00796b;
+  --negative: #c62828;
+  --positive: #247b50;
+  --grid:     #e8e8f0;
+}
 
-    /* ── Top bar ── */
-    #topbar {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: .5rem 1rem; display: flex; align-items: center; gap: 1rem;
-      flex-shrink: 0; flex-wrap: wrap;
-    }
-    #topbar h1 { font-size: 1rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
-    .tb-group { display: flex; align-items: center; gap: .5rem; }
-    .tb-label { font-size: .78rem; color: var(--text-m); white-space: nowrap; }
-    input[type=number] {
-      width: 80px; padding: .35rem .6rem; background: var(--bg); color: var(--text);
-      border: 1px solid var(--border); border-radius: 6px; font-size: .88rem;
-    }
-    .btn {
-      padding: .4rem .9rem; border: none; border-radius: 7px;
-      font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap;
-    }
-    .btn:active { opacity: .75; }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-accent  { background: var(--accent);  color: #fff; }
-    .btn-warn    { background: #fb8c00; color: #fff; }
-    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-    #server-url  { font-size: .82rem; color: var(--accent); font-family: monospace; }
-    #status-dot  {
-      width: 9px; height: 9px; border-radius: 50%; background: #555; flex-shrink: 0;
-    }
-    #status-dot.running { background: #4db6ac; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  background: var(--ground);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+}
 
-    /* ── Body ── */
-    #body { flex: 1; display: flex; overflow: hidden; }
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+#topbar {
+  height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+#topbar-mark {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 6px;
+}
+#topbar-mark svg { flex-shrink: 0; }
+#topbar-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.tb-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.tb-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+input[type=number] {
+  width: 72px;
+  height: 28px;
+  padding: 0 8px;
+  background: var(--raised);
+  color: var(--text);
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  -moz-appearance: textfield;
+}
+input[type=number]::-webkit-inner-spin-button { opacity: 0; }
+input[type=number]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.btn:hover { background: var(--active); }
+.btn:active { opacity: 0.75; }
+.btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-accent:hover { opacity: 0.88; background: var(--accent); }
+.btn-warn { background: #fb8c00; color: #fff; border-color: #fb8c00; }
+.btn-warn:hover { opacity: 0.88; background: #fb8c00; }
+#server-url-wrap { display: flex; align-items: center; gap: 6px; }
+#server-url {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  user-select: all;
+}
+#url-eye {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--faint);
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+}
+#url-eye:hover { color: var(--muted); }
+#status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex-shrink: 0;
+}
+#status-dot.running { background: var(--accent); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+#tb-spacer { flex: 1; }
 
-    /* ── Sidebar ── */
-    #sidebar {
-      width: 240px; flex-shrink: 0;
-      background: var(--surface); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .sb-section { padding: .75rem; border-bottom: 1px solid var(--border); }
-    .sb-title {
-      font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--text-m); font-weight: 700; margin-bottom: .5rem;
-    }
-    #sensor-tree { flex: 1; overflow-y: auto; padding: .5rem 0; }
+/* Live Hz badge */
+#hz-badge {
+  display: none;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--faint);
+  white-space: nowrap;
+}
+#hz-badge.active { display: block; color: var(--accent); }
 
-    /* Sensor group */
-    .sensor-group { }
-    .sensor-header {
-      display: flex; align-items: center; gap: .5rem;
-      padding: .35rem .75rem; cursor: pointer; user-select: none;
-      font-size: .85rem; font-weight: 600;
-    }
-    .sensor-header:hover { background: var(--surface2); }
-    .sensor-toggle { font-size: .65rem; color: var(--text-m); transition: transform .15s; }
-    .sensor-toggle.open { transform: rotate(90deg); }
-    .sensor-name { flex: 1; }
-    .sensor-check input { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
+/* ── Body ────────────────────────────────────────────────────────────────── */
+#body { flex: 1; display: flex; overflow: hidden; }
 
-    /* Field rows */
-    .field-list { padding-left: 1rem; display: none; }
-    .field-list.open { display: block; }
-    .field-row {
-      display: flex; align-items: center; gap: .5rem;
-      padding: .28rem .75rem; font-size: .82rem; cursor: pointer;
-    }
-    .field-row:hover { background: var(--surface2); }
-    .field-row input { accent-color: var(--primary); width: 13px; height: 13px; cursor: pointer; }
-    .field-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sb-section {
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.sb-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 6px;
+}
+.sb-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+.sb-all-btn {
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.sb-all-btn:hover { color: var(--text); }
 
-    /* Device section */
-    #device-list { display: flex; flex-direction: column; gap: .3rem; }
-    .device-row {
-      display: flex; align-items: center; gap: .5rem;
-      font-size: .82rem; padding: .2rem 0;
-    }
-    .device-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .device-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .device-count { font-size: .72rem; color: var(--text-m); }
-    #no-devices { font-size: .8rem; color: var(--text-m); }
+#sensor-tree { flex: 1; overflow-y: auto; }
+#sensor-tree::-webkit-scrollbar { width: 4px; }
+#sensor-tree::-webkit-scrollbar-track { background: transparent; }
+#sensor-tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-    /* ── Graph area ── */
-    #graph-area {
-      flex: 1; display: flex; flex-direction: column; overflow: hidden;
-    }
-    #graph-wrap { flex: 1; position: relative; }
-    canvas#graph { display: block; width: 100%; height: 100%; }
+.sensor-group { }
+.sensor-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.sensor-header:hover { background: var(--raised); }
+.sensor-toggle {
+  font-size: 9px;
+  color: var(--faint);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  width: 10px;
+  text-align: center;
+}
+.sensor-toggle.open { transform: rotate(90deg); }
+.sensor-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sensor-check input {
+  width: 13px; height: 13px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
 
-    /* Paused overlay */
-    #paused-badge {
-      display: none; position: absolute; top: .75rem; right: .75rem;
-      background: rgba(251,140,0,.9); color: #fff;
-      padding: .3rem .8rem; border-radius: 6px;
-      font-size: .82rem; font-weight: 700;
-    }
-    #paused-badge.visible { display: block; }
+.field-list { display: none; }
+.field-list.open { display: block; }
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 22px;
+  cursor: pointer;
+}
+.field-row:hover { background: var(--raised); }
+.field-row input {
+  width: 13px; height: 13px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+.field-swatch {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.field-label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.field-val {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--faint);
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Device section */
+#device-section { padding: 8px 12px; }
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+}
+.device-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.device-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.device-hz {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--faint);
+}
+#no-devices { font-size: 12px; color: var(--faint); padding: 2px 0; }
+
+/* ── Graph area ──────────────────────────────────────────────────────────── */
+#graph-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+#graph-wrap { flex: 1; position: relative; min-height: 0; }
+canvas#graph { display: block; width: 100%; height: 100%; }
+
+/* Paused overlay */
+#paused-badge {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(251,140,0,0.92);
+  color: #fff;
+  padding: 3px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#paused-badge.visible { display: block; }
+
+/* Zoom hint */
+#zoom-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  color: var(--faint);
+  pointer-events: none;
+}
   </style>
 </head>
 <body>
 
 <!-- Top bar -->
 <div id="topbar">
-  <h1>📡 Sensor Logger Szerver</h1>
-
-  <div class="tb-group">
-    <span class="tb-label">Port:</span>
-    <input type="number" id="port-input" value="8080" min="1024" max="65535" />
-    <button class="btn btn-primary" id="start-btn">▶ Indítás</button>
-    <button class="btn btn-ghost"   id="stop-btn" style="display:none">■ Stop</button>
+  <div id="topbar-mark">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect width="18" height="18" rx="4" fill="var(--accent)" opacity="0.15"/>
+      <polyline points="2,13 5,8 8,10 11,5 14,7 17,3" stroke="var(--accent)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span id="topbar-name">Sensor Monitor</span>
   </div>
 
-  <div class="tb-group">
-    <span id="status-dot"></span>
-    <span id="server-url" style="display:none"></span>
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">Port</span>
+  <input type="number" id="port-input" value="8080" min="1024" max="65535" />
+  <button class="btn btn-accent" id="start-btn">▶ Indítás</button>
+  <button class="btn" id="stop-btn" style="display:none">■ Stop</button>
+
+  <div class="tb-sep"></div>
+
+  <div id="status-dot"></div>
+  <div id="server-url-wrap" style="display:none">
+    <span id="server-url"></span>
+    <button id="url-eye" title="Elrejt / Megmutat">●</button>
   </div>
 
-  <div style="flex:1"></div>
+  <div class="tb-sep"></div>
 
-  <div class="tb-group">
-    <span class="tb-label">Időablak:</span>
-    <input type="number" id="window-input" value="30" min="5" max="300" style="width:60px"/>
-    <span class="tb-label">mp</span>
-  </div>
+  <span class="tb-label">Ablak</span>
+  <input type="number" id="window-input" value="30" min="5" max="300" style="width:52px"/>
+  <span class="tb-label">s</span>
+
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">Hz</span>
+  <input type="number" id="hz-input" value="30" min="1" max="100" style="width:52px"/>
+
+  <div id="tb-spacer"></div>
+
+  <span id="hz-badge"></span>
 
   <button class="btn btn-warn" id="pause-btn">⏸ Szünet</button>
-  <button class="btn btn-ghost" id="clear-btn">🗑 Törlés</button>
+  <button class="btn" id="clear-btn">Törlés</button>
+  <button class="btn" id="theme-btn" title="Téma váltás">☾</button>
 </div>
 
 <!-- Body -->
@@ -157,11 +393,21 @@
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <div id="sensor-tree"></div>
+    <div class="sb-section" id="sensor-section">
+      <div class="sb-section-header">
+        <span class="sb-title">Szenzorok</span>
+        <button class="sb-all-btn" id="all-btn">Összes ▾</button>
+      </div>
+      <div id="sensor-tree"></div>
+    </div>
 
-    <div class="sb-section" style="flex-shrink:0">
-      <div class="sb-title">Eszközök</div>
-      <div id="device-list"><span id="no-devices">Nincs adat</span></div>
+    <div class="sb-section">
+      <div class="sb-section-header">
+        <span class="sb-title">Eszközök</span>
+      </div>
+      <div id="device-section">
+        <div id="no-devices">Nincs adat</div>
+      </div>
     </div>
   </div>
 
@@ -170,45 +416,46 @@
     <div id="graph-wrap">
       <canvas id="graph"></canvas>
       <div id="paused-badge">⏸ SZÜNETELTETVE</div>
+      <div id="zoom-hint">Scroll: zoom · Shift+scroll: eltolás</div>
     </div>
   </div>
 
 </div>
 
 <script>
-// ── Constants & colours ───────────────────────────────────────────────────
-const DEVICE_COLORS = [
-  '#e53935','#1e88e5','#43a047','#fb8c00',
-  '#8e24aa','#00acc1','#f4511e','#6d4c41',
-];
-const FIELD_COLORS = [
-  '#ef5350','#42a5f5','#66bb6a','#ffa726',
-  '#ab47bc','#26c6da','#ff7043','#8d6e63',
-  '#ec407a','#7e57c2','#26a69a','#d4e157',
-];
-
-const MAX_POINTS = 10000; // per series
+// ── Palette ───────────────────────────────────────────────────────────────
+const DEVICE_COLORS = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1','#f4511e','#6d4c41'];
+const FIELD_COLORS  = ['#4db6ac','#ef5350','#42a5f5','#66bb6a','#ffa726','#ab47bc','#26c6da','#ff7043','#8d6e63','#ec407a','#7e57c2','#d4e157'];
+const MAX_POINTS    = 20000;
 
 // ── State ─────────────────────────────────────────────────────────────────
-// series key: `${deviceId}::${sensor}::${field}`
-const seriesData   = new Map();   // key → [{tMs, value}]  (tMs = ms since session start)
-const seriesMeta   = new Map();   // key → {deviceId, sensor, field, color, enabled}
-const devices      = new Map();   // deviceId → {color, firstTime, count}
-const sensors      = new Map();   // sensor → Set of fields
-const sessionStart = new Map();   // deviceId → first timeNs seen
+const seriesData  = new Map();  // key → [{tMs, value}]
+const seriesMeta  = new Map();  // key → {deviceId, sensor, field, color, enabled}
+const devices     = new Map();  // deviceId → {color, count, lastHz}
+const sensors     = new Map();  // sensor → Set of fields
+const sessionStart= new Map();  // deviceId → first timeNs
+
+// Display buffer: smoothed points for rendering
+const displayBuffer = new Map(); // key → [{tMs, value}] (downsampled for render)
 
 let paused      = false;
 let windowSec   = 30;
-let serverRunning = false;
+let displayHz   = 30;
+let zoomScale   = 1.0;   // multiplier on windowSec (>1 = zoomed in, shows less time)
+let panOffsetMs = 0;     // ms offset from the "live" right edge (0 = live)
 
-// Pending buffer: readings received while paused, merged on resume
 const pendingBuffer = [];
+
+// Incoming Hz tracking
+const incomingCounts = new Map(); // deviceId → count this second
+let lastHzReset = Date.now();
+const deviceHz = new Map();       // deviceId → last measured Hz
 
 // ── DOM ───────────────────────────────────────────────────────────────────
 const canvas      = document.getElementById('graph');
 const ctx         = canvas.getContext('2d');
 const sensorTree  = document.getElementById('sensor-tree');
-const deviceList  = document.getElementById('device-list');
+const deviceSec   = document.getElementById('device-section');
 const noDevices   = document.getElementById('no-devices');
 const pausedBadge = document.getElementById('paused-badge');
 const pauseBtn    = document.getElementById('pause-btn');
@@ -216,32 +463,60 @@ const clearBtn    = document.getElementById('clear-btn');
 const startBtn    = document.getElementById('start-btn');
 const stopBtn     = document.getElementById('stop-btn');
 const serverUrl   = document.getElementById('server-url');
+const urlWrap     = document.getElementById('server-url-wrap');
+const eyeBtn      = document.getElementById('url-eye');
 const statusDot   = document.getElementById('status-dot');
 const windowInput = document.getElementById('window-input');
+const hzInput     = document.getElementById('hz-input');
+const hzBadge     = document.getElementById('hz-badge');
+const themeBtn    = document.getElementById('theme-btn');
+const allBtn      = document.getElementById('all-btn');
 
-// ── Server control ────────────────────────────────────────────────────────
+// ── Server ────────────────────────────────────────────────────────────────
 startBtn.addEventListener('click', async () => {
   const port = parseInt(document.getElementById('port-input').value);
-  const res = await window.api.serverStart({ port });
+  const res  = await window.api.serverStart({ port });
   if (res.ok) {
-    serverRunning = true;
     startBtn.style.display = 'none';
     stopBtn.style.display  = '';
     serverUrl.textContent  = res.url;
-    serverUrl.style.display = '';
+    urlWrap.style.display  = 'flex';
     statusDot.classList.add('running');
+    urlHidden = false;
+    eyeBtn.textContent = '●';
   } else {
     alert('Hiba: ' + res.error);
   }
 });
-
 stopBtn.addEventListener('click', async () => {
   await window.api.serverStop();
-  serverRunning = false;
   startBtn.style.display = '';
   stopBtn.style.display  = 'none';
-  serverUrl.style.display = 'none';
+  urlWrap.style.display  = 'none';
   statusDot.classList.remove('running');
+});
+
+// ── URL hide/show ─────────────────────────────────────────────────────────
+let urlHidden = false;
+let realUrl   = '';
+eyeBtn.addEventListener('click', () => {
+  urlHidden = !urlHidden;
+  if (urlHidden) {
+    realUrl = serverUrl.textContent;
+    serverUrl.textContent = '••••••••••••••';
+    eyeBtn.textContent = '○';
+  } else {
+    serverUrl.textContent = realUrl;
+    eyeBtn.textContent = '●';
+  }
+});
+
+// ── Theme ─────────────────────────────────────────────────────────────────
+let isDark = true;
+themeBtn.addEventListener('click', () => {
+  isDark = !isDark;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  themeBtn.textContent = isDark ? '☾' : '☀';
 });
 
 // ── Pause ─────────────────────────────────────────────────────────────────
@@ -251,29 +526,75 @@ pauseBtn.addEventListener('click', () => {
   pauseBtn.className   = paused ? 'btn btn-accent' : 'btn btn-warn';
   pausedBadge.classList.toggle('visible', paused);
   if (!paused && pendingBuffer.length) {
-    pendingBuffer.forEach(batch => ingestBatch(batch));
+    pendingBuffer.forEach(b => ingestBatch(b));
     pendingBuffer.length = 0;
   }
 });
 
 // ── Clear ─────────────────────────────────────────────────────────────────
 clearBtn.addEventListener('click', () => {
-  seriesData.clear();
-  seriesMeta.clear();
-  devices.clear();
-  sensors.clear();
-  sessionStart.clear();
-  pendingBuffer.length = 0;
-  rebuildSensorTree();
-  renderDeviceList();
+  seriesData.clear(); seriesMeta.clear(); devices.clear();
+  sensors.clear(); sessionStart.clear(); pendingBuffer.length = 0;
+  displayBuffer.clear(); deviceHz.clear(); incomingCounts.clear();
+  zoomScale = 1; panOffsetMs = 0;
+  rebuildSensorTree(); renderDeviceList();
 });
 
-// ── Window slider ─────────────────────────────────────────────────────────
-windowInput.addEventListener('input', () => {
-  windowSec = Math.max(5, parseInt(windowInput.value) || 30);
+// ── Window / Hz ───────────────────────────────────────────────────────────
+windowInput.addEventListener('input', () => { windowSec = Math.max(5, parseInt(windowInput.value)||30); });
+hzInput.addEventListener('input', () => { displayHz = Math.max(1, Math.min(100, parseInt(hzInput.value)||30)); });
+
+// ── Select/deselect all ───────────────────────────────────────────────────
+let allEnabled = true;
+allBtn.addEventListener('click', () => {
+  allEnabled = !allEnabled;
+  allBtn.textContent = allEnabled ? 'Összes ▾' : 'Egyik sem ▾';
+  for (const [, meta] of seriesMeta) meta.enabled = allEnabled;
+  // sync checkboxes
+  sensorTree.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = allEnabled);
 });
 
-// ── Ingest data ───────────────────────────────────────────────────────────
+// ── Zoom & pan ─────────────────────────────────────────────────────────────
+document.getElementById('graph-wrap').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (e.shiftKey) {
+    // Pan: shift+scroll
+    const delta = e.deltaY * windowSec * zoomScale * 0.002 * 1000;
+    panOffsetMs = Math.max(0, panOffsetMs + delta);
+  } else {
+    // Zoom
+    const factor = e.deltaY > 0 ? 1.12 : 0.88;
+    zoomScale = Math.max(0.05, Math.min(20, zoomScale * factor));
+  }
+}, { passive: false });
+
+// ── Incoming Hz tracking ───────────────────────────────────────────────────
+function trackIncoming(deviceId, count) {
+  incomingCounts.set(deviceId, (incomingCounts.get(deviceId) || 0) + count);
+  const now = Date.now();
+  if (now - lastHzReset >= 1000) {
+    for (const [id, cnt] of incomingCounts) {
+      deviceHz.set(id, cnt);
+    }
+    incomingCounts.clear();
+    lastHzReset = now;
+    updateHzBadge();
+    renderDeviceList();
+  }
+}
+
+function updateHzBadge() {
+  let total = 0;
+  for (const hz of deviceHz.values()) total += hz;
+  if (total > 0) {
+    hzBadge.textContent = `${total} Hz beérkező`;
+    hzBadge.classList.add('active');
+  } else {
+    hzBadge.classList.remove('active');
+  }
+}
+
+// ── Ingest ────────────────────────────────────────────────────────────────
 window.api.onSensorData((batch) => {
   if (paused) { pendingBuffer.push(batch); return; }
   ingestBatch(batch);
@@ -281,56 +602,37 @@ window.api.onSensorData((batch) => {
 
 function ingestBatch(batch) {
   const { deviceId, readings } = batch;
-
-  // Assign device colour and track session start time
   if (!devices.has(deviceId)) {
     const color = DEVICE_COLORS[devices.size % DEVICE_COLORS.length];
     devices.set(deviceId, { color, count: 0 });
     renderDeviceList();
   }
   const dev = devices.get(deviceId);
+  trackIncoming(deviceId, readings.length);
 
   for (const r of readings) {
-    // Establish session start per device from first reading
-    if (!sessionStart.has(deviceId)) {
-      sessionStart.set(deviceId, r.timeNs);
-    }
+    if (!sessionStart.has(deviceId)) sessionStart.set(deviceId, r.timeNs);
     const tMs = (r.timeNs - sessionStart.get(deviceId)) / 1_000_000;
 
-    // Track known sensors/fields
-    if (!sensors.has(r.sensor)) {
-      sensors.set(r.sensor, new Set());
-      rebuildSensorTree();
-    }
+    if (!sensors.has(r.sensor)) { sensors.set(r.sensor, new Set()); rebuildSensorTree(); }
     const fieldSet = sensors.get(r.sensor);
-    if (!fieldSet.has(r.field)) {
-      fieldSet.add(r.field);
-      rebuildSensorTree();
-    }
+    if (!fieldSet.has(r.field)) { fieldSet.add(r.field); rebuildSensorTree(); }
 
-    // Get or create series
     const key = `${deviceId}::${r.sensor}::${r.field}`;
     if (!seriesData.has(key)) {
       const colorIdx = seriesMeta.size % FIELD_COLORS.length;
-      seriesMeta.set(key, {
-        deviceId, sensor: r.sensor, field: r.field,
-        color: FIELD_COLORS[colorIdx],
-        enabled: true,
-      });
+      seriesMeta.set(key, { deviceId, sensor: r.sensor, field: r.field, color: FIELD_COLORS[colorIdx], enabled: true });
       seriesData.set(key, []);
     }
-
     const pts = seriesData.get(key);
     pts.push({ tMs, value: r.value });
     if (pts.length > MAX_POINTS) pts.splice(0, pts.length - MAX_POINTS);
-
     dev.count++;
   }
-
   renderDeviceList();
 }
 
-// ── Sensor tree ───────────────────────────────────────────────────────────
+// ── Sensor tree ────────────────────────────────────────────────────────────
 function rebuildSensorTree() {
   sensorTree.innerHTML = '';
   for (const [sensor, fields] of sensors) {
@@ -344,32 +646,29 @@ function rebuildSensorTree() {
     toggle.className = 'sensor-toggle open';
     toggle.textContent = '▶';
 
-    const name = document.createElement('span');
-    name.className = 'sensor-name';
-    name.textContent = sensor;
+    const nameEl = document.createElement('span');
+    nameEl.className = 'sensor-name';
+    nameEl.textContent = sensor;
 
-    // "select all" checkbox for this sensor
     const allCheck = document.createElement('span');
     allCheck.className = 'sensor-check';
     const allCb = document.createElement('input');
     allCb.type = 'checkbox';
     allCb.checked = true;
-    allCb.title = 'Összes komponens';
-    allCb.addEventListener('change', () => {
+    allCb.title = 'Összes';
+    allCb.addEventListener('change', (e) => {
+      e.stopPropagation();
       for (const field of fields) {
         for (const [key, meta] of seriesMeta) {
-          if (meta.sensor === sensor && meta.field === field) {
-            meta.enabled = allCb.checked;
-          }
+          if (meta.sensor === sensor && meta.field === field) meta.enabled = allCb.checked;
         }
       }
-      // sync field checkboxes
       group.querySelectorAll('.field-row input').forEach(cb => cb.checked = allCb.checked);
     });
     allCheck.appendChild(allCb);
 
     header.appendChild(toggle);
-    header.appendChild(name);
+    header.appendChild(nameEl);
     header.appendChild(allCheck);
 
     const fieldList = document.createElement('div');
@@ -377,6 +676,9 @@ function rebuildSensorTree() {
 
     let fi = 0;
     for (const field of fields) {
+      const color = FIELD_COLORS[fi % FIELD_COLORS.length];
+      fi++;
+
       const row = document.createElement('div');
       row.className = 'field-row';
 
@@ -387,30 +689,36 @@ function rebuildSensorTree() {
         for (const [key, meta] of seriesMeta) {
           if (meta.sensor === sensor && meta.field === field) meta.enabled = cb.checked;
         }
-        // update "all" checkbox state
-        const anyUnchecked = [...fields].some(f => {
+        const anyOff = [...fields].some(f => {
           for (const [, m] of seriesMeta) if (m.sensor === sensor && m.field === f && !m.enabled) return true;
           return false;
         });
-        allCb.indeterminate = anyUnchecked;
-        allCb.checked = !anyUnchecked;
+        allCb.indeterminate = anyOff && [...fields].some(f => {
+          for (const [, m] of seriesMeta) if (m.sensor === sensor && m.field === f && m.enabled) return true;
+          return false;
+        });
+        allCb.checked = !anyOff;
       });
 
-      const dot = document.createElement('span');
-      dot.className = 'field-color';
-      dot.style.background = FIELD_COLORS[fi % FIELD_COLORS.length];
-      fi++;
+      const swatch = document.createElement('span');
+      swatch.className = 'field-swatch';
+      swatch.style.background = color;
 
       const lbl = document.createElement('span');
+      lbl.className = 'field-label';
       lbl.textContent = field;
 
+      const val = document.createElement('span');
+      val.className = 'field-val';
+      val.id = `fval-${CSS.escape(field)}-${CSS.escape(sensor)}`;
+
       row.appendChild(cb);
-      row.appendChild(dot);
+      row.appendChild(swatch);
       row.appendChild(lbl);
+      row.appendChild(val);
       fieldList.appendChild(row);
     }
 
-    // Toggle collapse
     header.addEventListener('click', (e) => {
       if (e.target === allCb || e.target.closest('.sensor-check')) return;
       const open = fieldList.classList.toggle('open');
@@ -423,22 +731,20 @@ function rebuildSensorTree() {
   }
 }
 
-// ── Device list ───────────────────────────────────────────────────────────
+// ── Device list ────────────────────────────────────────────────────────────
 function renderDeviceList() {
-  deviceList.innerHTML = '';
-  if (devices.size === 0) {
-    deviceList.appendChild(noDevices);
-    return;
-  }
+  deviceSec.innerHTML = '';
+  if (devices.size === 0) { deviceSec.appendChild(noDevices); return; }
   for (const [id, dev] of devices) {
     const row = document.createElement('div');
     row.className = 'device-row';
+    const hz = deviceHz.get(id) || 0;
     row.innerHTML = `
       <span class="device-dot" style="background:${dev.color}"></span>
-      <span class="device-name" title="${id}">${id.slice(0, 12)}…</span>
-      <span class="device-count">${dev.count}</span>
+      <span class="device-name" title="${id}">${id.slice(0,10)}…</span>
+      <span class="device-hz">${hz > 0 ? hz + ' Hz' : ''}</span>
     `;
-    deviceList.appendChild(row);
+    deviceSec.appendChild(row);
   }
 }
 
@@ -451,120 +757,170 @@ function resizeCanvas() {
 resizeCanvas();
 new ResizeObserver(resizeCanvas).observe(document.getElementById('graph-wrap'));
 
-// ── Draw ──────────────────────────────────────────────────────────────────
-const PAD = { top: 30, right: 20, bottom: 40, left: 70 };
+// ── Downsampled display data ───────────────────────────────────────────────
+// Called at displayHz rate to rebuild display buffers from raw data
+function rebuildDisplayBuffers() {
+  for (const [key, pts] of seriesData) {
+    if (!seriesMeta.get(key)?.enabled) continue;
+    // Already stored raw; for rendering we just use raw (renderer decimates)
+    // Display buffer is just a reference here — we decimate inline in draw
+  }
+}
 
-function draw() {
+// ── Draw ──────────────────────────────────────────────────────────────────
+const PAD = { top: 28, right: 16, bottom: 36, left: 62 };
+let lastDrawTime = 0;
+
+function draw(now) {
+  requestAnimationFrame(draw);
+
+  // Throttle to displayHz
+  const interval = 1000 / displayHz;
+  if (now - lastDrawTime < interval) return;
+  lastDrawTime = now;
+
   const W = canvas.width, H = canvas.height;
   const DPR = devicePixelRatio;
   ctx.clearRect(0, 0, W, H);
 
-  ctx.fillStyle = '#0f0f1a';
+  // Background
+  const isDarkTheme = document.documentElement.getAttribute('data-theme') !== 'light';
+  ctx.fillStyle = isDarkTheme ? '#0f0f1a' : '#f4f5f8';
   ctx.fillRect(0, 0, W, H);
 
   const plotW = W - (PAD.left + PAD.right) * DPR;
   const plotH = H - (PAD.top  + PAD.bottom) * DPR;
-  const ox = PAD.left * DPR;
-  const oy = PAD.top  * DPR;
+  const ox = PAD.left * DPR, oy = PAD.top * DPR;
 
-  if (plotW <= 0 || plotH <= 0) { requestAnimationFrame(draw); return; }
+  if (plotW <= 0 || plotH <= 0) return;
 
-  // Collect enabled series with data
+  // Collect active series
   const active = [];
   for (const [key, meta] of seriesMeta) {
     if (!meta.enabled) continue;
     const pts = seriesData.get(key);
-    if (!pts || !pts.length) continue;
+    if (!pts?.length) continue;
     active.push({ key, meta, pts });
   }
 
-  // Time range: latest point across all enabled series → windowSec back
+  // Time range
   let tMaxMs = 0;
   for (const { pts } of active) {
-    if (pts[pts.length - 1].tMs > tMaxMs) tMaxMs = pts[pts.length - 1].tMs;
+    const last = pts[pts.length - 1].tMs;
+    if (last > tMaxMs) tMaxMs = last;
   }
-  const tMinMs = tMaxMs - windowSec * 1000;
 
-  // Value range across all visible points in window
+  const visibleWindow = windowSec * 1000 / zoomScale;
+  const tEndMs  = tMaxMs - panOffsetMs;
+  const tStartMs = tEndMs - visibleWindow;
+
+  // Value range
   let vMin = Infinity, vMax = -Infinity;
   for (const { pts } of active) {
     for (const p of pts) {
-      if (p.tMs < tMinMs) continue;
+      if (p.tMs < tStartMs || p.tMs > tEndMs) continue;
       if (p.value < vMin) vMin = p.value;
       if (p.value > vMax) vMax = p.value;
     }
   }
   if (!isFinite(vMin)) { vMin = -1; vMax = 1; }
   if (vMin === vMax)   { vMin -= 1; vMax += 1; }
-  const vPad = (vMax - vMin) * 0.08;
+  const vRange = vMax - vMin;
+  const vPad = vRange * 0.07;
   vMin -= vPad; vMax += vPad;
 
-  function tx(tMs) { return ox + ((tMs - tMinMs) / (windowSec * 1000)) * plotW; }
+  function tx(tMs) { return ox + ((tMs - tStartMs) / (visibleWindow)) * plotW; }
   function ty(v)   { return oy + (1 - (v - vMin) / (vMax - vMin)) * plotH; }
 
-  // Grid
-  ctx.strokeStyle = '#1e1e3a';
+  // Grid lines
+  const gridColor = isDarkTheme ? '#1e1e2e' : '#e8e8f0';
+  const tickColor = isDarkTheme ? '#4a4a60' : '#9090a8';
+  const textColor = isDarkTheme ? '#6a6a80' : '#8888a0';
+
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
-  const hLines = 5;
+  const hLines = 4;
   for (let i = 0; i <= hLines; i++) {
     const y = oy + (i / hLines) * plotH;
     ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + plotW, y); ctx.stroke();
-    const val = vMax - (i / hLines) * (vMax - vMin);
-    ctx.fillStyle = '#555';
-    ctx.font = `${11 * DPR}px system-ui`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(val.toPrecision(4), ox - 6 * DPR, y);
   }
 
-  // Time axis ticks
-  const tickCount = Math.min(8, Math.floor(plotW / (60 * DPR)));
-  ctx.fillStyle = '#555';
-  ctx.font = `${11 * DPR}px system-ui`;
-  ctx.textAlign = 'center';
+  // Y labels
+  ctx.fillStyle = textColor;
+  ctx.font = `${11 * DPR}px "JetBrains Mono", monospace`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i <= hLines; i++) {
+    const y   = oy + (i / hLines) * plotH;
+    const val = vMax - (i / hLines) * (vMax - vMin);
+    ctx.fillText(fmtVal(val), ox - 5 * DPR, y);
+  }
+
+  // X ticks
+  const tickCount = Math.min(8, Math.floor(plotW / (55 * DPR)));
+  ctx.font = `${11 * DPR}px "JetBrains Mono", monospace`;
+  ctx.textAlign  = 'center';
   ctx.textBaseline = 'top';
   for (let i = 0; i <= tickCount; i++) {
-    const tMs = tMinMs + (i / tickCount) * windowSec * 1000;
+    const tMs = tStartMs + (i / tickCount) * visibleWindow;
     const x   = tx(tMs);
-    ctx.strokeStyle = '#1e1e3a';
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, oy); ctx.lineTo(x, oy + plotH); ctx.stroke();
-    const sec = (tMs / 1000).toFixed(1);
-    ctx.fillStyle = '#555';
-    ctx.fillText(sec + 's', x, oy + plotH + 5 * DPR);
+    ctx.fillStyle = textColor;
+    ctx.fillText((tMs / 1000).toFixed(1) + 's', x, oy + plotH + 5 * DPR);
   }
 
-  // Plot each series
+  // Plot series (decimate inline to displayHz)
+  const targetPts = Math.round(plotW / DPR * 1.5); // max points to render
   for (const { meta, pts } of active) {
-    // Filter to window + one point before for continuity
+    // Filter to visible window
     const visible = [];
-    for (let i = 0; i < pts.length; i++) {
-      if (pts[i].tMs >= tMinMs - 1000 && pts[i].tMs <= tMaxMs + 100) {
-        visible.push(pts[i]);
-      }
+    for (const p of pts) {
+      if (p.tMs >= tStartMs - 200 && p.tMs <= tEndMs + 200) visible.push(p);
     }
     if (visible.length < 2) continue;
+
+    // Decimate
+    const step = Math.max(1, Math.floor(visible.length / targetPts));
+    const decimated = step === 1 ? visible : visible.filter((_, i) => i % step === 0);
 
     ctx.strokeStyle = meta.color;
     ctx.lineWidth   = 1.5 * DPR;
     ctx.lineJoin    = 'round';
     ctx.beginPath();
     let started = false;
-    for (const p of visible) {
+    for (const p of decimated) {
       const x = tx(p.tMs), y = ty(p.value);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
+
+    // Update sidebar live value
+    if (visible.length) {
+      const last = visible[visible.length - 1].value;
+      const el = document.querySelector(`#fval-${CSS.escape(meta.field)}-${CSS.escape(meta.sensor)}`);
+      if (el) el.textContent = fmtVal(last);
+    }
   }
 
-  // Axes borders
-  ctx.strokeStyle = '#333';
+  // Plot border
+  ctx.strokeStyle = isDarkTheme ? '#1e1e30' : '#d8d8e8';
   ctx.lineWidth = 1;
   ctx.strokeRect(ox, oy, plotW, plotH);
-
-  requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
+
+function fmtVal(v) {
+  if (!isFinite(v)) return '–';
+  const abs = Math.abs(v);
+  if (abs >= 1000)  return v.toFixed(0);
+  if (abs >= 100)   return v.toFixed(1);
+  if (abs >= 10)    return v.toFixed(2);
+  if (abs >= 0.001) return v.toFixed(3);
+  return v.toExponential(2);
+}
 </script>
 </body>
 </html>
