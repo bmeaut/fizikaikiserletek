@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sensor Logger Szerver</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0f0f1a;
+      --surface:   #1a1a2e;
+      --surface2:  #22223a;
+      --border:    #2a2a4a;
+      --text:      #e0e0e0;
+      --text-m:    #888;
+      --primary:   #7986cb;
+      --accent:    #4db6ac;
+      --danger:    #ef9a9a;
+      --radius:    10px;
+    }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: .5rem 1rem; display: flex; align-items: center; gap: 1rem;
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    #topbar h1 { font-size: 1rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+    .tb-group { display: flex; align-items: center; gap: .5rem; }
+    .tb-label { font-size: .78rem; color: var(--text-m); white-space: nowrap; }
+    input[type=number] {
+      width: 80px; padding: .35rem .6rem; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px; font-size: .88rem;
+    }
+    .btn {
+      padding: .4rem .9rem; border: none; border-radius: 7px;
+      font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn:active { opacity: .75; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-accent  { background: var(--accent);  color: #fff; }
+    .btn-warn    { background: #fb8c00; color: #fff; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    #server-url  { font-size: .82rem; color: var(--accent); font-family: monospace; }
+    #status-dot  {
+      width: 9px; height: 9px; border-radius: 50%; background: #555; flex-shrink: 0;
+    }
+    #status-dot.running { background: #4db6ac; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ── Body ── */
+    #body { flex: 1; display: flex; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 240px; flex-shrink: 0;
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sb-section { padding: .75rem; border-bottom: 1px solid var(--border); }
+    .sb-title {
+      font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--text-m); font-weight: 700; margin-bottom: .5rem;
+    }
+    #sensor-tree { flex: 1; overflow-y: auto; padding: .5rem 0; }
+
+    /* Sensor group */
+    .sensor-group { }
+    .sensor-header {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .35rem .75rem; cursor: pointer; user-select: none;
+      font-size: .85rem; font-weight: 600;
+    }
+    .sensor-header:hover { background: var(--surface2); }
+    .sensor-toggle { font-size: .65rem; color: var(--text-m); transition: transform .15s; }
+    .sensor-toggle.open { transform: rotate(90deg); }
+    .sensor-name { flex: 1; }
+    .sensor-check input { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
+
+    /* Field rows */
+    .field-list { padding-left: 1rem; display: none; }
+    .field-list.open { display: block; }
+    .field-row {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .28rem .75rem; font-size: .82rem; cursor: pointer;
+    }
+    .field-row:hover { background: var(--surface2); }
+    .field-row input { accent-color: var(--primary); width: 13px; height: 13px; cursor: pointer; }
+    .field-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Device section */
+    #device-list { display: flex; flex-direction: column; gap: .3rem; }
+    .device-row {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .82rem; padding: .2rem 0;
+    }
+    .device-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .device-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .device-count { font-size: .72rem; color: var(--text-m); }
+    #no-devices { font-size: .8rem; color: var(--text-m); }
+
+    /* ── Graph area ── */
+    #graph-area {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+    #graph-wrap { flex: 1; position: relative; }
+    canvas#graph { display: block; width: 100%; height: 100%; }
+
+    /* Paused overlay */
+    #paused-badge {
+      display: none; position: absolute; top: .75rem; right: .75rem;
+      background: rgba(251,140,0,.9); color: #fff;
+      padding: .3rem .8rem; border-radius: 6px;
+      font-size: .82rem; font-weight: 700;
+    }
+    #paused-badge.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <h1>📡 Sensor Logger Szerver</h1>
+
+  <div class="tb-group">
+    <span class="tb-label">Port:</span>
+    <input type="number" id="port-input" value="8080" min="1024" max="65535" />
+    <button class="btn btn-primary" id="start-btn">▶ Indítás</button>
+    <button class="btn btn-ghost"   id="stop-btn" style="display:none">■ Stop</button>
+  </div>
+
+  <div class="tb-group">
+    <span id="status-dot"></span>
+    <span id="server-url" style="display:none"></span>
+  </div>
+
+  <div style="flex:1"></div>
+
+  <div class="tb-group">
+    <span class="tb-label">Időablak:</span>
+    <input type="number" id="window-input" value="30" min="5" max="300" style="width:60px"/>
+    <span class="tb-label">mp</span>
+  </div>
+
+  <button class="btn btn-warn" id="pause-btn">⏸ Szünet</button>
+  <button class="btn btn-ghost" id="clear-btn">🗑 Törlés</button>
+</div>
+
+<!-- Body -->
+<div id="body">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="sensor-tree"></div>
+
+    <div class="sb-section" style="flex-shrink:0">
+      <div class="sb-title">Eszközök</div>
+      <div id="device-list"><span id="no-devices">Nincs adat</span></div>
+    </div>
+  </div>
+
+  <!-- Graph -->
+  <div id="graph-area">
+    <div id="graph-wrap">
+      <canvas id="graph"></canvas>
+      <div id="paused-badge">⏸ SZÜNETELTETVE</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Constants & colours ───────────────────────────────────────────────────
+const DEVICE_COLORS = [
+  '#e53935','#1e88e5','#43a047','#fb8c00',
+  '#8e24aa','#00acc1','#f4511e','#6d4c41',
+];
+const FIELD_COLORS = [
+  '#ef5350','#42a5f5','#66bb6a','#ffa726',
+  '#ab47bc','#26c6da','#ff7043','#8d6e63',
+  '#ec407a','#7e57c2','#26a69a','#d4e157',
+];
+
+const MAX_POINTS = 10000; // per series
+
+// ── State ─────────────────────────────────────────────────────────────────
+// series key: `${deviceId}::${sensor}::${field}`
+const seriesData   = new Map();   // key → [{tMs, value}]  (tMs = ms since session start)
+const seriesMeta   = new Map();   // key → {deviceId, sensor, field, color, enabled}
+const devices      = new Map();   // deviceId → {color, firstTime, count}
+const sensors      = new Map();   // sensor → Set of fields
+const sessionStart = new Map();   // deviceId → first timeNs seen
+
+let paused      = false;
+let windowSec   = 30;
+let serverRunning = false;
+
+// Pending buffer: readings received while paused, merged on resume
+const pendingBuffer = [];
+
+// ── DOM ───────────────────────────────────────────────────────────────────
+const canvas      = document.getElementById('graph');
+const ctx         = canvas.getContext('2d');
+const sensorTree  = document.getElementById('sensor-tree');
+const deviceList  = document.getElementById('device-list');
+const noDevices   = document.getElementById('no-devices');
+const pausedBadge = document.getElementById('paused-badge');
+const pauseBtn    = document.getElementById('pause-btn');
+const clearBtn    = document.getElementById('clear-btn');
+const startBtn    = document.getElementById('start-btn');
+const stopBtn     = document.getElementById('stop-btn');
+const serverUrl   = document.getElementById('server-url');
+const statusDot   = document.getElementById('status-dot');
+const windowInput = document.getElementById('window-input');
+
+// ── Server control ────────────────────────────────────────────────────────
+startBtn.addEventListener('click', async () => {
+  const port = parseInt(document.getElementById('port-input').value);
+  const res = await window.api.serverStart({ port });
+  if (res.ok) {
+    serverRunning = true;
+    startBtn.style.display = 'none';
+    stopBtn.style.display  = '';
+    serverUrl.textContent  = res.url;
+    serverUrl.style.display = '';
+    statusDot.classList.add('running');
+  } else {
+    alert('Hiba: ' + res.error);
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  await window.api.serverStop();
+  serverRunning = false;
+  startBtn.style.display = '';
+  stopBtn.style.display  = 'none';
+  serverUrl.style.display = 'none';
+  statusDot.classList.remove('running');
+});
+
+// ── Pause ─────────────────────────────────────────────────────────────────
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? '▶ Folytatás' : '⏸ Szünet';
+  pauseBtn.className   = paused ? 'btn btn-accent' : 'btn btn-warn';
+  pausedBadge.classList.toggle('visible', paused);
+  if (!paused && pendingBuffer.length) {
+    pendingBuffer.forEach(batch => ingestBatch(batch));
+    pendingBuffer.length = 0;
+  }
+});
+
+// ── Clear ─────────────────────────────────────────────────────────────────
+clearBtn.addEventListener('click', () => {
+  seriesData.clear();
+  seriesMeta.clear();
+  devices.clear();
+  sensors.clear();
+  sessionStart.clear();
+  pendingBuffer.length = 0;
+  rebuildSensorTree();
+  renderDeviceList();
+});
+
+// ── Window slider ─────────────────────────────────────────────────────────
+windowInput.addEventListener('input', () => {
+  windowSec = Math.max(5, parseInt(windowInput.value) || 30);
+});
+
+// ── Ingest data ───────────────────────────────────────────────────────────
+window.api.onSensorData((batch) => {
+  if (paused) { pendingBuffer.push(batch); return; }
+  ingestBatch(batch);
+});
+
+function ingestBatch(batch) {
+  const { deviceId, readings } = batch;
+
+  // Assign device colour and track session start time
+  if (!devices.has(deviceId)) {
+    const color = DEVICE_COLORS[devices.size % DEVICE_COLORS.length];
+    devices.set(deviceId, { color, count: 0 });
+    renderDeviceList();
+  }
+  const dev = devices.get(deviceId);
+
+  for (const r of readings) {
+    // Establish session start per device from first reading
+    if (!sessionStart.has(deviceId)) {
+      sessionStart.set(deviceId, r.timeNs);
+    }
+    const tMs = (r.timeNs - sessionStart.get(deviceId)) / 1_000_000;
+
+    // Track known sensors/fields
+    if (!sensors.has(r.sensor)) {
+      sensors.set(r.sensor, new Set());
+      rebuildSensorTree();
+    }
+    const fieldSet = sensors.get(r.sensor);
+    if (!fieldSet.has(r.field)) {
+      fieldSet.add(r.field);
+      rebuildSensorTree();
+    }
+
+    // Get or create series
+    const key = `${deviceId}::${r.sensor}::${r.field}`;
+    if (!seriesData.has(key)) {
+      const colorIdx = seriesMeta.size % FIELD_COLORS.length;
+      seriesMeta.set(key, {
+        deviceId, sensor: r.sensor, field: r.field,
+        color: FIELD_COLORS[colorIdx],
+        enabled: true,
+      });
+      seriesData.set(key, []);
+    }
+
+    const pts = seriesData.get(key);
+    pts.push({ tMs, value: r.value });
+    if (pts.length > MAX_POINTS) pts.splice(0, pts.length - MAX_POINTS);
+
+    dev.count++;
+  }
+
+  renderDeviceList();
+}
+
+// ── Sensor tree ───────────────────────────────────────────────────────────
+function rebuildSensorTree() {
+  sensorTree.innerHTML = '';
+  for (const [sensor, fields] of sensors) {
+    const group = document.createElement('div');
+    group.className = 'sensor-group';
+
+    const header = document.createElement('div');
+    header.className = 'sensor-header';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'sensor-toggle open';
+    toggle.textContent = '▶';
+
+    const name = document.createElement('span');
+    name.className = 'sensor-name';
+    name.textContent = sensor;
+
+    // "select all" checkbox for this sensor
+    const allCheck = document.createElement('span');
+    allCheck.className = 'sensor-check';
+    const allCb = document.createElement('input');
+    allCb.type = 'checkbox';
+    allCb.checked = true;
+    allCb.title = 'Összes komponens';
+    allCb.addEventListener('change', () => {
+      for (const field of fields) {
+        for (const [key, meta] of seriesMeta) {
+          if (meta.sensor === sensor && meta.field === field) {
+            meta.enabled = allCb.checked;
+          }
+        }
+      }
+      // sync field checkboxes
+      group.querySelectorAll('.field-row input').forEach(cb => cb.checked = allCb.checked);
+    });
+    allCheck.appendChild(allCb);
+
+    header.appendChild(toggle);
+    header.appendChild(name);
+    header.appendChild(allCheck);
+
+    const fieldList = document.createElement('div');
+    fieldList.className = 'field-list open';
+
+    let fi = 0;
+    for (const field of fields) {
+      const row = document.createElement('div');
+      row.className = 'field-row';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      cb.addEventListener('change', () => {
+        for (const [key, meta] of seriesMeta) {
+          if (meta.sensor === sensor && meta.field === field) meta.enabled = cb.checked;
+        }
+        // update "all" checkbox state
+        const anyUnchecked = [...fields].some(f => {
+          for (const [, m] of seriesMeta) if (m.sensor === sensor && m.field === f && !m.enabled) return true;
+          return false;
+        });
+        allCb.indeterminate = anyUnchecked;
+        allCb.checked = !anyUnchecked;
+      });
+
+      const dot = document.createElement('span');
+      dot.className = 'field-color';
+      dot.style.background = FIELD_COLORS[fi % FIELD_COLORS.length];
+      fi++;
+
+      const lbl = document.createElement('span');
+      lbl.textContent = field;
+
+      row.appendChild(cb);
+      row.appendChild(dot);
+      row.appendChild(lbl);
+      fieldList.appendChild(row);
+    }
+
+    // Toggle collapse
+    header.addEventListener('click', (e) => {
+      if (e.target === allCb || e.target.closest('.sensor-check')) return;
+      const open = fieldList.classList.toggle('open');
+      toggle.classList.toggle('open', open);
+    });
+
+    group.appendChild(header);
+    group.appendChild(fieldList);
+    sensorTree.appendChild(group);
+  }
+}
+
+// ── Device list ───────────────────────────────────────────────────────────
+function renderDeviceList() {
+  deviceList.innerHTML = '';
+  if (devices.size === 0) {
+    deviceList.appendChild(noDevices);
+    return;
+  }
+  for (const [id, dev] of devices) {
+    const row = document.createElement('div');
+    row.className = 'device-row';
+    row.innerHTML = `
+      <span class="device-dot" style="background:${dev.color}"></span>
+      <span class="device-name" title="${id}">${id.slice(0, 12)}…</span>
+      <span class="device-count">${dev.count}</span>
+    `;
+    deviceList.appendChild(row);
+  }
+}
+
+// ── Canvas resize ─────────────────────────────────────────────────────────
+function resizeCanvas() {
+  const wrap = document.getElementById('graph-wrap');
+  canvas.width  = Math.round(wrap.clientWidth  * devicePixelRatio);
+  canvas.height = Math.round(wrap.clientHeight * devicePixelRatio);
+}
+resizeCanvas();
+new ResizeObserver(resizeCanvas).observe(document.getElementById('graph-wrap'));
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+const PAD = { top: 30, right: 20, bottom: 40, left: 70 };
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  const DPR = devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.fillStyle = '#0f0f1a';
+  ctx.fillRect(0, 0, W, H);
+
+  const plotW = W - (PAD.left + PAD.right) * DPR;
+  const plotH = H - (PAD.top  + PAD.bottom) * DPR;
+  const ox = PAD.left * DPR;
+  const oy = PAD.top  * DPR;
+
+  if (plotW <= 0 || plotH <= 0) { requestAnimationFrame(draw); return; }
+
+  // Collect enabled series with data
+  const active = [];
+  for (const [key, meta] of seriesMeta) {
+    if (!meta.enabled) continue;
+    const pts = seriesData.get(key);
+    if (!pts || !pts.length) continue;
+    active.push({ key, meta, pts });
+  }
+
+  // Time range: latest point across all enabled series → windowSec back
+  let tMaxMs = 0;
+  for (const { pts } of active) {
+    if (pts[pts.length - 1].tMs > tMaxMs) tMaxMs = pts[pts.length - 1].tMs;
+  }
+  const tMinMs = tMaxMs - windowSec * 1000;
+
+  // Value range across all visible points in window
+  let vMin = Infinity, vMax = -Infinity;
+  for (const { pts } of active) {
+    for (const p of pts) {
+      if (p.tMs < tMinMs) continue;
+      if (p.value < vMin) vMin = p.value;
+      if (p.value > vMax) vMax = p.value;
+    }
+  }
+  if (!isFinite(vMin)) { vMin = -1; vMax = 1; }
+  if (vMin === vMax)   { vMin -= 1; vMax += 1; }
+  const vPad = (vMax - vMin) * 0.08;
+  vMin -= vPad; vMax += vPad;
+
+  function tx(tMs) { return ox + ((tMs - tMinMs) / (windowSec * 1000)) * plotW; }
+  function ty(v)   { return oy + (1 - (v - vMin) / (vMax - vMin)) * plotH; }
+
+  // Grid
+  ctx.strokeStyle = '#1e1e3a';
+  ctx.lineWidth = 1;
+  const hLines = 5;
+  for (let i = 0; i <= hLines; i++) {
+    const y = oy + (i / hLines) * plotH;
+    ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + plotW, y); ctx.stroke();
+    const val = vMax - (i / hLines) * (vMax - vMin);
+    ctx.fillStyle = '#555';
+    ctx.font = `${11 * DPR}px system-ui`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(val.toPrecision(4), ox - 6 * DPR, y);
+  }
+
+  // Time axis ticks
+  const tickCount = Math.min(8, Math.floor(plotW / (60 * DPR)));
+  ctx.fillStyle = '#555';
+  ctx.font = `${11 * DPR}px system-ui`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let i = 0; i <= tickCount; i++) {
+    const tMs = tMinMs + (i / tickCount) * windowSec * 1000;
+    const x   = tx(tMs);
+    ctx.strokeStyle = '#1e1e3a';
+    ctx.beginPath(); ctx.moveTo(x, oy); ctx.lineTo(x, oy + plotH); ctx.stroke();
+    const sec = (tMs / 1000).toFixed(1);
+    ctx.fillStyle = '#555';
+    ctx.fillText(sec + 's', x, oy + plotH + 5 * DPR);
+  }
+
+  // Plot each series
+  for (const { meta, pts } of active) {
+    // Filter to window + one point before for continuity
+    const visible = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].tMs >= tMinMs - 1000 && pts[i].tMs <= tMaxMs + 100) {
+        visible.push(pts[i]);
+      }
+    }
+    if (visible.length < 2) continue;
+
+    ctx.strokeStyle = meta.color;
+    ctx.lineWidth   = 1.5 * DPR;
+    ctx.lineJoin    = 'round';
+    ctx.beginPath();
+    let started = false;
+    for (const p of visible) {
+      const x = tx(p.tMs), y = ty(p.value);
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Axes borders
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox, oy, plotW, plotH);
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

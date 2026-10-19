@@ -14,6 +14,7 @@ telepíthetők és internet-kapcsolat nélkül is működnek.
 |------------|--------|-------|
 | [Tapadási együttható mérő](apps/surlodas/) | Felület tapadási együtthatójának mérése gyorsulásmérővel | Önálló PWA |
 | [Hanghullám-oszcilloszkóp](apps/oscilloscope/) | Tanuló PWA — csatlakozik a tanári Electron szerverhez | Szerver + PWA |
+| [Sensor Logger Szerver](apps/sensor-logger-server/) | Fogadja a Sensor Logger app adatait, valós idejű grafikon | Electron szerver |
 
 ## Felépítés
 
@@ -29,7 +30,17 @@ fizikaikiserletek/
 └── experiment-ideas/       # Kísérletötletek és architektúra kutatás
 ```
 
-## Tanári szerver futtatása (Oszcilloszkóp)
+## Sensor Logger Szerver futtatása
+
+1. Nyisd meg az `apps/sensor-logger-server/` mappát
+2. `npm install`
+3. `npm start`
+4. Add meg a portot és kattints **▶ Indítás**
+5. A megjelenő URL-t (`http://192.168.x.x:8080/data`) add meg a Sensor Logger appban
+
+> Terjesztéshez: `npm run dist` → Windows telepítő `.exe`
+
+## Hanghullám-oszcilloszkóp szerver futtatása
 
 1. Nyisd meg az `apps/oscilloscope-server/` mappát
 2. `npm install`
