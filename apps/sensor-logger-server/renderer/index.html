@@ -134,15 +134,18 @@ input[type=number]:focus { outline: 1px solid var(--accent); border-color: var(-
   user-select: all;
 }
 #url-eye {
-  background: none;
-  border: none;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--raised);
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
   cursor: pointer;
-  color: var(--faint);
-  font-size: 14px;
-  padding: 0 2px;
-  line-height: 1;
+  color: var(--muted);
+  font-size: 12px;
+  font-family: var(--font);
+  white-space: nowrap;
 }
-#url-eye:hover { color: var(--muted); }
+#url-eye:hover { color: var(--text); background: var(--active); }
 #status-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -175,10 +178,19 @@ input[type=number]:focus { outline: 1px solid var(--accent); border-color: var(-
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 .sb-section {
   border-bottom: 1px solid var(--rule);
   flex-shrink: 0;
+}
+/* Sensor section grows to fill available space and scrolls internally */
+#sensor-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .sb-section-header {
   display: flex;
@@ -203,10 +215,10 @@ input[type=number]:focus { outline: 1px solid var(--accent); border-color: var(-
 }
 .sb-all-btn:hover { color: var(--text); }
 
-#sensor-tree { flex: 1; overflow-y: auto; }
-#sensor-tree::-webkit-scrollbar { width: 4px; }
+#sensor-tree { flex: 1; overflow-y: scroll; min-height: 0; }
+#sensor-tree::-webkit-scrollbar { width: 6px; }
 #sensor-tree::-webkit-scrollbar-track { background: transparent; }
-#sensor-tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+#sensor-tree::-webkit-scrollbar-thumb { background: var(--control); border-radius: 3px; }
 
 .sensor-group { }
 .sensor-header {
@@ -365,7 +377,7 @@ canvas#graph { display: block; width: 100%; height: 100%; }
   <div id="status-dot"></div>
   <div id="server-url-wrap" style="display:none">
     <span id="server-url"></span>
-    <button id="url-eye" title="Elrejt / Megmutat">●</button>
+    <button id="url-eye">IP elrejtése</button>
   </div>
 
   <div class="tb-sep"></div>
@@ -416,7 +428,7 @@ canvas#graph { display: block; width: 100%; height: 100%; }
     <div id="graph-wrap">
       <canvas id="graph"></canvas>
       <div id="paused-badge">⏸ SZÜNETELTETVE</div>
-      <div id="zoom-hint">Scroll: zoom · Shift+scroll: eltolás</div>
+      <div id="zoom-hint">Scroll: Y zoom · Shift+scroll: időablak</div>
     </div>
   </div>
 
@@ -441,7 +453,8 @@ const displayBuffer = new Map(); // key → [{tMs, value}] (downsampled for rend
 let paused      = false;
 let windowSec   = 30;
 let displayHz   = 30;
-let zoomScale   = 1.0;   // multiplier on windowSec (>1 = zoomed in, shows less time)
+let vZoomScale  = 1.0;   // >1 = zoomed in on Y (shows narrower value range)
+let vPanCenter  = null;  // null = auto-center; number = manual center value
 let panOffsetMs = 0;     // ms offset from the "live" right edge (0 = live)
 
 const pendingBuffer = [];
@@ -504,10 +517,10 @@ eyeBtn.addEventListener('click', () => {
   if (urlHidden) {
     realUrl = serverUrl.textContent;
     serverUrl.textContent = '••••••••••••••';
-    eyeBtn.textContent = '○';
+    eyeBtn.textContent = 'IP megmutatása';
   } else {
     serverUrl.textContent = realUrl;
-    eyeBtn.textContent = '●';
+    eyeBtn.textContent = 'IP elrejtése';
   }
 });
 
@@ -536,7 +549,7 @@ clearBtn.addEventListener('click', () => {
   seriesData.clear(); seriesMeta.clear(); devices.clear();
   sensors.clear(); sessionStart.clear(); pendingBuffer.length = 0;
   displayBuffer.clear(); deviceHz.clear(); incomingCounts.clear();
-  zoomScale = 1; panOffsetMs = 0;
+  vZoomScale = 1; vPanCenter = null; panOffsetMs = 0;
   rebuildSensorTree(); renderDeviceList();
 });
 
@@ -558,13 +571,14 @@ allBtn.addEventListener('click', () => {
 document.getElementById('graph-wrap').addEventListener('wheel', (e) => {
   e.preventDefault();
   if (e.shiftKey) {
-    // Pan: shift+scroll
-    const delta = e.deltaY * windowSec * zoomScale * 0.002 * 1000;
-    panOffsetMs = Math.max(0, panOffsetMs + delta);
+    // Shift+scroll: widen/narrow time window
+    const factor = e.deltaY > 0 ? 1.15 : 0.87;
+    windowSec = Math.max(5, Math.min(300, windowSec * factor));
+    windowInput.value = Math.round(windowSec);
   } else {
-    // Zoom
-    const factor = e.deltaY > 0 ? 1.12 : 0.88;
-    zoomScale = Math.max(0.05, Math.min(20, zoomScale * factor));
+    // Plain scroll: zoom Y (value range)
+    const factor = e.deltaY > 0 ? 1.15 : 0.87;
+    vZoomScale = Math.max(0.05, Math.min(50, vZoomScale * factor));
   }
 }, { passive: false });
 
@@ -803,18 +817,19 @@ function draw(now) {
     active.push({ key, meta, pts });
   }
 
-  // Time range
+  // Latest timestamp across all active series
   let tMaxMs = 0;
   for (const { pts } of active) {
     const last = pts[pts.length - 1].tMs;
     if (last > tMaxMs) tMaxMs = last;
   }
 
-  const visibleWindow = windowSec * 1000 / zoomScale;
-  const tEndMs  = tMaxMs - panOffsetMs;
+  // Time range (fixed window, no zoom on time axis)
+  const visibleWindow = windowSec * 1000;
+  const tEndMs   = tMaxMs - panOffsetMs;
   const tStartMs = tEndMs - visibleWindow;
 
-  // Value range
+  // Value range — auto from visible data, then apply vZoomScale around center
   let vMin = Infinity, vMax = -Infinity;
   for (const { pts } of active) {
     for (const p of pts) {
@@ -825,9 +840,14 @@ function draw(now) {
   }
   if (!isFinite(vMin)) { vMin = -1; vMax = 1; }
   if (vMin === vMax)   { vMin -= 1; vMax += 1; }
-  const vRange = vMax - vMin;
-  const vPad = vRange * 0.07;
-  vMin -= vPad; vMax += vPad;
+  const vRange  = vMax - vMin;
+  const vPad    = vRange * 0.07;
+  const vAutoMin = vMin - vPad;
+  const vAutoMax = vMax + vPad;
+  const vCenter  = (vAutoMin + vAutoMax) / 2;
+  const vHalf    = (vAutoMax - vAutoMin) / 2 / vZoomScale;
+  vMin = vCenter - vHalf;
+  vMax = vCenter + vHalf;
 
   function tx(tMs) { return ox + ((tMs - tStartMs) / (visibleWindow)) * plotW; }
   function ty(v)   { return oy + (1 - (v - vMin) / (vMax - vMin)) * plotH; }
